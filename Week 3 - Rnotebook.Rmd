@@ -1,0 +1,1102 @@
+---
+title: "Week 3 script"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Preliminaries...........
+```{r}
+rm(list=ls()) # Clears the R brain. 
+dev.off() # turn off former graphics device 
+```
+
+**********************************************************
+PART ONE: Displaying frequencies and distributions of 
+variables using bar charts and histograms
+**********************************************************
+
+**********************************************************
+PART 1.1: Barcharts  
+Use datafile called RIKZ.txt. This is file listing the macroinvertebrate richness of of 45 samples from 9 Dutch beaches (Zuur et al. Beginner's guide). We're going to create a barchart of the species richness on the nine beaches
+
+Load the data
+REMEMBER this file needs to be in your working directory! OR save it as a CSV and then import using read.csv with the file.choose() function
+This is a horrible task much more easily achieved in other programmes!!!!
+**********************************************************
+```{r}
+Benthic <- read.table(file="RIKZ.txt", header = TRUE)
+```
+
+
+Calculate the mean and SD and SE (for errors bars) using dplyr
+```{r}
+Benth.M <- tapply(Benthic$Richness, INDEX = Benthic$Beach, FUN = mean)
+Benth.SD <- tapply(Benthic$Richness, INDEX = Benthic$Beach, FUN = sd)
+```
+
+Create basic bargraph using base plotting. 
+
+```{r}
+barplot(Benth.M)
+```
+
+add labels, axis limits (using the xlab() & ylab() functions) and colour (in this case using the rainbow() function)
+ylim() function tells R to limit the axis range from 0-20 (there is a xlim() function also)
+```{r}
+barplot(Benth.M, xlab = "Beach", ylab = "Richness", ylim = c(0, 20), col = "Powderblue")
+```
+
+add some error bars using sd. Start by creating an object with the base graph
+create some arrows for the error bars; draws a line between cordinates (X1, Y1)
+lwd function stipulate line width; angle the angle of the tick; length, it's length
+```{r}
+bp.sd <- barplot(Benth.M, xlab = "Beach", ylab = "Richness", ylim = c(0, 20), col = "Powderblue")
+arrows(bp.sd, Benth.M, bp.sd, Benth.M + Benth.SD, lwd = 1.5, angle = 90, length = 0.1)
+box() # draws a box around the graphic
+```
+
+To create a standard error bars we merely divide the sd by the square root of the sample size
+We'll use the length function to calculate the number of samples per beach (but there are five)
+```{r}
+Benth.L <- tapply(Benthic$Richness, INDEX = Benthic$Beach, FUN = length)
+Benth.SE <- Benth.SD / sqrt(Benth.L)
+```
+
+recreate the plot using standard errors
+```{r}
+bp.se <- barplot(Benth.M, xlab = "Beach", ylab = "Richness", ylim = c(0, 20), col = "Powderblue")
+```
+
+create some arrows for the error bars; draws a line between cordinates (X1, Y1)
+```{r}
+arrows(bp.se, Benth.M, bp.se, Benth.M + Benth.SE, lwd = 1.5, angle = 90, length = 0.1)
+box() # draws a box around the graphic
+```
+
+now let's suppose you want both of these on the same plot. You can instruct R to do this using the mfrow() function
+This tells R to make a graphics window that is 1 row by 2 columms in this case. c(2, 2)  would be 2 rows by 2 columns
+the mar() function tells R how much space you want around the plots at each corner starting from: bottom,left, top, right
+```{r}
+op <- par(mfrow = c(1, 2), mar = c(2, 2, 2, 1)) # stores the graphics parameters in the variable op.
+bp.sd <- barplot(Benth.M, xlab = "Beach", ylab = "Richness", ylim = c(0, 20), col = "Powderblue", main = " Standard Deviation")
+arrows(bp.sd, Benth.M, bp.sd, Benth.M + Benth.SD, lwd = 1.5, angle = 90, length = 0.1)
+box() # Places a box around the plot
+bp.se <- barplot(Benth.M, xlab = "Beach", ylab = "Richness", ylim = c(0, 20), col = "Powderblue", main = " Standard Error")
+arrows(bp.se, Benth.M, bp.se, Benth.M + Benth.SE, lwd = 1.5, angle = 90, length = 0.1)
+box()
+par(op) # sets the graphics parameters to default.
+```
+
+And now in ggplot.....less mucking about.
+CHECK out the cheatsheet at:
+https://www.rstudio.com/wp-content/uploads/2015/03/ggplot2-cheatsheet.pdf
+calculate summaries in dplyr (mean, sd, se)
+
+```{r}
+require(dplyr)
+require(ggplot2)
+Errors <- summarise(group_by(Benthic, Beach), mean=mean(Richness), sd=sd(Richness), 
+                    length=length(Richness), se=(sd/sqrt(length)))
+Errors # Have a look at this. Beauty is that dplyr generates a dataframe!
+ggplot(Errors, aes(x = factor(Beach), y = mean)) +  
+  geom_bar(stat = "identity") + # We need this command ggplot is trying to bin and summarize the beaches (remember, geom_bar defaults to stat = stat_count); obviously this will not work.
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width = 0.2) + # width scales the error bars
+  xlab("Beach") + # add x label
+  ylab("Mean Richness") + #add y label
+  ggtitle("Richness of bivalves on beaches in Holland")   #add main title
+```
+
+**********************************************************
+PART 1.2: Histograms
+Useful to visualise distributions or probability density functions
+Helps to assess data structure / skewness etc
+We will use the compensation dataset for this (ozone.csv)
+derived from Beckerman and Petchy and their analysis.
+Key functions here is hist(); remember to list these and 
+others on the Canvas pages in your group document
+**********************************************************
+
+We'll use the air pollution data from the graphics cookbook (airpollution.csv)
+```{r}
+Air <- read.csv(file.choose(), header=T)
+```
+check data
+```{r}
+head(Air)
+str(Air) # 336 observations of 2 variables NOx and pm10s
+```
+
+plot the histogram
+```{r}
+hist(Air$Nitrogen.Oxides)
+```
+
+We can also look at the probability of not frequency 
+```{r}
+hist(Air$Nitrogen.Oxides, freq = FALSE, xlab = "NOx", main = "")
+```
+
+# We can use the break function to change the number of binned items on the x axis
+```{r}
+hist(Air$Nitrogen.Oxides, xlab = "NOx", main = "", breaks = 20, xlim = c(0, 600))
+```
+
+Now let's jazz the plot up and look at both density and probability
+```{r}
+par(las = 1) # Flips Y axis labels to horizontal so they're easier to read
+hist(Air$Nitrogen.Oxides, xlab = "NOx", prob = TRUE, main = "", 
+     breaks = 20, xlim = c(0, 600), col = "black", border = "white")
+lines(density(Air$Nitrogen.Oxides, na.rm = T), col = "red", lwd = 4) 
+```
+These kinds of lines are useful for histograms of residuals in regression models
+The lines() function plots the density line on top of the histogram
+na.rm = T disregards NA (missing data); col sets the line to red; lwd sets the line thickness
+
+And in ggplot.....
+```{r}
+library(ggplot2)
+ggplot(data=subset(Air, !is.na(Nitrogen.Oxides)), aes(x=Nitrogen.Oxides)) + geom_histogram(binwidth=20)
+```
+ggplot does not like NAs in the data for plots (see data file - there are 4 rows)
+To avoid the error message we use: data=subset(Air, !is.an(Nitrogen.Oxides)) to subset the rows with numbers
+
+Draw with black outline, white fill
+```{r}
+ggplot(data=subset(Air, !is.na(Nitrogen.Oxides)),aes(x=Nitrogen.Oxides)) +
+  geom_histogram(binwidth=20, colour="black", fill="white")
+```
+
+# Density curve
+```{r}
+ggplot(data=subset(Air, !is.na(Nitrogen.Oxides)), aes(x=Nitrogen.Oxides)) + geom_density()
+```
+
+Histogram overlaid with kernel density curve
+```{r}
+ggplot(data=subset(Air, !is.na(Nitrogen.Oxides)), aes(x=Nitrogen.Oxides)) + 
+  geom_histogram(aes(y=..density..),      # Histogram with density instead of count on y-axis
+                 binwidth=20,
+                 colour="black", fill="white") +
+  geom_density(alpha=.2, fill="#FF6666")  # Overlay with transparent density plot
+```
+
+
+**********************************************************
+PART TWO: Displaying associations between variables      *
+**********************************************************
+
+**********************************************************
+PART 2.1: Boxplots                                       *
+Code (Zuur et al. Beginner's guide)                      *
+**********************************************************
+Boxplots are great for examining data structure. This is a key element of any analytical programme
+If you've cleared R's brain then reload it with this read.table command
+Key functions here is boxplot(); remember to list these and others on the Canvas pages in your group document
+
+load dataset RIKZ.txt; You've already got this in your workspace as 'Benthic'
+```{r}
+Benthic <- read.table(file="RIKZ.txt", header = TRUE)
+```
+
+Check data
+```{r}
+str(Benthic)
+head(Benthic)
+```
+
+Create Boxplot using boxplot() function
+Notice we have a data = argument so we don't need to specify a $ operator
+Notice also that the ~ operator separates the two variables we need Richness = Y and Beach  = X
+```{r}
+boxplot(Richness ~ Beach, data = Benthic) 
+```
+
+Add some colour and labels
+```{r}
+boxplot(Richness ~ Beach, data = Benthic,
+        col = "powderblue", xlab = "Beach", ylab = "Species Richness")
+
+```
+
+In ggplot.....
+```{r}
+ggplot(Benthic, aes(x=as.factor(Beach), y=Richness)) + 
+  geom_boxplot() +  
+  xlab("Beach") + # add x label
+  ylab("Richness")  #add y label
+```
+
+You can use notch boxes but they look like space invaders....
+```{r}
+ggplot(Benthic, aes(x=as.factor(Beach), y=Richness)) + 
+  geom_boxplot(notch=TRUE) +  
+  xlab("Beach") + # add x label
+  ylab("Richness")  #add y label
+```
+
+Or vary the outlier colours and symbols....have a play..
+```{r}
+ggplot(Benthic, aes(x=as.factor(Beach), y=Richness)) + 
+  geom_boxplot(outlier.colour="red", outlier.shape=8,
+               outlier.size=4) +  
+  xlab("Beach") + # add x label
+  ylab("Richness")  #add y label
+```
+
+Or add the data points on top of the plot....with transparency (alpha) and size control (size)
+```{r}
+ggplot(Benthic, aes(x=as.factor(Beach), y=Richness)) +
+  geom_boxplot() +
+  geom_point(colour="red", alpha=.3, size = 3) +
+  xlab("Beach") + # add x label
+  ylab("Richness")  #add y label
+```
+
+**********************************************************
+PART 2.2: Cleveland dotplots                             * 
+Code (Zuur et al. Beginner's guide)                      *
+**********************************************************
+Dotplots are an excellent tool to look for outliers in data series
+Key functions here is dotchart(); remember to list these and others on the Canvas pages in your group document
+We are going to use the deer parasite data from Zuur's beginner's guide (Deer.txt);
+We used it last week
+
+Load file
+```{r}
+Deer <- read.csv(file.choose(), header=T)
+```
+
+Check data
+```{r}
+str(Deer)
+head(Deer)
+```
+Notice it has missing values! Or NAs...
+
+create dochart
+```{r}
+dotchart(Deer$LCT, xlab = "Length (cm)", ylab = " Observation number") # LCT = animal length
+```
+It is evident that most of the animals are about 160cm long but 3 are around 80.
+We need to accommodate these in an analysis; preferably not by removing them!
+
+You can extend the dot chart by making them conditional on factors
+```{r}
+dotchart(Deer$LCT, groups = factor(Deer$Sex))
+```
+
+This crashes because variable 'Sex' has missing values; here's the fix:
+```{r}
+Isna <-is.na(Deer$Sex) # The isn.na() function creates a vector the same length as Sex with values TRUE and FALSE
+dotchart(Deer$LCT[!Isna], # The ! symbol reverses them so only the variables without NA are plotted
+         groups = factor(Deer$Sex[!Isna]),
+         xlab = "Length (cm)", ylab = "Observations grouped by gender")
+```
+You can see that 1=males are generally larger in length; so there will be covariability in the data
+How else could you visualise this difference?
+
+Using ggplot....
+```{r}
+ggplot(Deer, aes(x = LCT, y = Farm)) +
+  geom_point() + 
+  facet_wrap(~ Sex, nrow = 1)
+```
+NOTE - it plots the NAs - you can remove them...have a try...
+
+As with most visualisation techniques you can layer data on top to illustrate other patterns
+We'll illustrate this with the beach benthic dataset RIKZ.text
+It should already be loaded as Benthic
+
+Conditioning variables need to be factors so we'll create a factor for beach
+```{r}
+Benthic$fBeach <- factor(Benthic$Beach)
+```
+
+Create a basic dotchart
+```{r}
+dotchart(Benthic$Richness, groups = Benthic$fBeach,
+         xlab = "Richness", ylab = "Beach")
+```
+
+Create a mean for each beach to display over the data points
+```{r}
+Benthic.M <- tapply(Benthic$Richness,Benthic$Beach, FUN = mean)
+```
+
+Add to the plot
+```{r}
+dotchart(Benthic$Richness, groups = Benthic$fBeach,
+         gdata = Benthic.M, gpch = 19,
+         xlab = "Richness", ylab = "Beach")
+# Now let's add a legend
+legend("bottomright", c("values", "mean"),
+       pch = c(1, 19), bg = "white")
+```
+g stands for group and gdata attribute is used to overlay a summary statistic (e.g. Medium, Mean etc)
+legend() calls the legend; bottomright attribute situates it;
+c("values", "mean") specifies the values and means for the legend
+pch = c(1, 19) tells it to plot values as open dots and means as filled dots
+bg sets the background to white
+
+
+**********************************************************
+PART 2.3: Scatterplots                                   *
+**********************************************************
+Key functions here is plot(); remember to list these and others on the Canvas pages in your group document
+Use the Vegetation.cvs datafile
+Code is from Zuur's beginner's guide
+key function is plot() from the base install of R
+
+load file
+```{r}
+Veg <- read.csv(file.choose(), header=TRUE)
+```
+
+check data
+```{r}
+str(Veg)
+head(Veg)
+```
+
+create basic x v y scatterplot
+```{r}
+plot(Veg$BARESOIL, Veg$R)
+```
+
+remember response variables should be on the Y axis. The plot function takes the first term as X;
+and the second as Y (don't forget that!)
+
+let's tidy it with labels and axis limits
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19))
+```
+
+And change the symbol type using the pch argument
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19),
+     pch = 19)
+? pch
+```
+
+pch can also be select different symbols in relation to another covariable
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19),
+     pch = Veg$Transect) # plots different symbols for each transect
+```
+It's a poor graph - way too complicated but it makes the point you can add to the information presented
+Note the pch argument cannot accept a factor it MUST be a vector 
+
+Let's create a vector with time as an additional variable
+Create new vector
+
+```{r}
+Veg$Time2 <- Veg$Time # Sets new variable Time2 the dimensions as Time
+```
+
+these allocate 1 and 16 against the appropriate times <= 1974 and > 1974
+```{r}
+Veg$Time2[Veg$Time <= 1974] <- 1 # pch = 1 means an open circle
+Veg$Time2[Veg$Time > 1974] <- 16 # pch = 2 means a filled circle
+Veg$Time2
+```
+
+Use the new vector to plot the graph
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19),
+     pch = Veg$Time2)
+```
+
+change the symbols
+```{r}
+Veg$Time2 <- Veg$Time
+Veg$Time2[Veg$Time <= 1974] <- 15 # = a filled square
+Veg$Time2[Veg$Time > 1974] <- 16  # = a filled circle
+```
+
+Use the new vector to plot the graph
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19),
+     pch = Veg$Time2)
+```
+
+Let's change the colour
+```{r}
+Veg$Col2 <- Veg$Time
+Veg$Col2[Veg$Time <= 1974] <- 1    # col = black
+Veg$Col2[Veg$Time > 1974] <- 2     # col = red
+```
+
+And plot the graph
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19),
+     pch = Veg$Time2,
+     col = Veg$Col2)
+```
+You can use the cex argument to create dots of different size, say to identify different years (see help ?cex)
+
+So a scatterplot on its own is not especially useful
+Let's add a line to capture the pattern of the relationship
+We'll add a linear fit line and then a loess smoother
+Linear fit using abline; we need to create a linear model using lm() to do this
+
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19), pch = 19)
+M0 <- lm(Veg$R ~ Veg$BARESOIL, data = Veg) # Notice that we have the dependent (response) variable first
+abline(M0)
+```
+
+Now we'll create a smoother and use the lines function to plot it. You can do the same for a linear fit (see class exercise)
+We will use the loess() function to create the smoother line
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19), pch = 19)
+M1 <- loess(Veg$R ~ Veg$BARESOIL, data = Veg) 
+Fit <- fitted(M1)  # Captures the fitted values
+lines(Veg$BARESOIL, Fit) # Adds the resultant lines
+```
+
+It's not pretty because the lines function captures each fitted point in sequence
+There are two fixes: 1. Order the data by BARESOIL (smallest to largest); or 2. Determine the order of BARESOIL and rearrange 
+the values in the lines command. We'll try option two.
+```{r}
+plot(x = Veg$BARESOIL, y = Veg$R,
+     xlab = "Exposed soil",
+     ylab = "Species richness", main = "Scatter plot",
+     xlim = c(0, 45), ylim = c(4, 19), pch = 19)
+M1 <- loess(Veg$R ~ Veg$BARESOIL, data = Veg) 
+Fit <- fitted(M1)  # Captures the fitted values
+Ord1 <- order(Veg$BARESOIL)
+lines(Veg$BARESOIL[Ord1], Fit[Ord1], col = "red", lwd = 3) # Adds the resultant lines, sorted according to the of BARESOIL
+```
+We also changed the colour of the line and its width
+
+This is MUCH easier to do in ggplot....
+Basic scatter plot
+```{r}
+ggplot(Veg, aes(x=BARESOIL, y=R)) + geom_point()
+```
+
+Change the point size, and shape
+```{r}
+ggplot(Veg, aes(x=BARESOIL, y=R)) +
+  geom_point(size=3, colour = "red")
+```
+
+The functions below can be used to add regression lines to a scatter plot :
+geom_smooth() and stat_smooth()
+geom_abline() or you can pass your regression to the plot....!
+geom - linear model
+```{r}
+ggplot(Veg, aes(x=BARESOIL, y=R)) +
+  geom_point(size=3, colour = "grey60") +
+  geom_smooth(method=lm) # it automatically adds standard errors onto the plot - pretty cool
+```
+
+You can remove these
+```{r}
+ggplot(Veg, aes(x=BARESOIL, y=R  )) +
+  geom_point(size=3, colour = "grey60") +
+  geom_smooth(method=lm, se=FALSE)
+```
+
+or we can apply a loess smoother to the plot
+```{r}
+ggplot(Veg, aes(x=BARESOIL, y=R  )) +
+  geom_point(size=3, colour = "grey60") +
+  geom_smooth()
+```
+
+Is is possible to split the regression lines based on a group of samples points (so say a sites with different management regimes)
+We'll use a dataset on cars (their mileage rates, weight and cylinder size) to do this. It's in ggplot already
+Add regression lines
+```{r}
+data(mtcars)
+ggplot(mtcars, aes(x=wt, y=mpg)) +
+  geom_point() +
+  geom_smooth(method=lm)
+```
+
+Add extended regression lines that differentiates cylinder size
+```{r}
+ggplot(mtcars, aes(x=wt, y=mpg, color=factor(cyl), shape=factor(cyl))) +
+  geom_point() + 
+  geom_smooth(method=lm)
+```
+Illustrate different relationships between 4-8 cylinder cars!
+
+Lastly we can colour code the SE too!
+```{r}
+ggplot(mtcars, aes(x=wt, y=mpg, color=factor(cyl), shape=factor(cyl))) +
+  geom_point() + 
+  geom_smooth(method=lm, aes(fill=factor(cyl)))
+```
+or we can pass the statistical model object but it's a bit tricky for this introductory class!
+
+**********************************************************
+PART 2.4: Plotting line graphs / time series using base graphics
+We'll be using the cityrain.csv dataset 
+see Mittal's R Graphics Cookbook for further guidance
+**********************************************************
+
+Load data (cityrain.csv)
+```{r}
+CR <- read.csv(file.choose(), header=TRUE)
+```
+
+Check data
+```{r}
+str(CR)
+head(CR)
+```
+
+first plot of rainfall in Toyko
+```{r}
+plot(CR$Tokyo, type = "b", lwd = 2, col = "Blue",
+     ylim = c(0, 300), ylab = "Rainfall (mm)",
+     xlab = "Month")
+```
+
+We can add a grid to the plot with one function call
+```{r}
+grid(lwd = 1, lty = 3, col = "black")
+```
+Most of these plot functions you've encoutered. The key element here is the type = "b" argument
+
+This plot the lines between the points; check help ?plot for other formats options
+```{r}
+plot(CR$Tokyo,type="b",lwd=2,
+     xaxt="n",ylim=c(0,300),col="black", # xaxt surpresses the X axis plotting because we're going to control it using axis()
+     xlab="Month",ylab="Rainfall (mm)",
+     main="Monthly Rainfall in major cities") # We'll add a title to this one too
+axis(1,at=1:length(CR$Month),labels=CR$Month) # sets the X axis to months using appropriate labels
+lines(CR$Berlin,col="red",type="b",lwd=2) # Add additional lines with different colours
+lines(CR$NewYork,col="orange",type="b",lwd=2)
+lines(CR$London,col="purple",type="b",lwd=2)
+
+legend("topright",legend=c("Tokyo","Berlin","New York","London"), # Adds legend with labels to top right of plot
+       lty=1,lwd=2,pch=21,col=c("black","red","orange","purple"), # sets line type, width, dot type/size and colour to the same as the plot
+       ncol=2,bty="n",cex=0.8,
+       text.col=c("black","red","orange","purple"), # Sets the text to the same colour as the lines
+       inset=0.01) # Sets the inset distance from the margins as a factor of plot size
+```
+
+In ggplot.....
+Data are in the wrong format - it's in short format where the columns are cities. We need it in long format, so we need to transpose it
+We'll use gather from tidyr to do this
+
+
+```{r}
+library(tidyr)
+CR_long <- CR %>%
+  gather(City, Ppt, c(Tokyo,NewYork,London,Berlin))
+CR_long # look at the new datafile
+```
+
+Basic plot with different lines...
+```{r}
+ggplot(CR_long, aes(x=Month, y=Ppt, group=City)) +
+  geom_line(aes(linetype=City))+
+  geom_point()
+```
+
+Change line types and point shapes
+```{r}
+ggplot(CR_long, aes(x=Month, y=Ppt, group=City)) +
+  geom_line(aes(linetype=City))+
+  geom_point(aes(shape=City))
+```
+
+Change line colours and point shapes - have a play with lines types and colour!
+```{r}
+ggplot(CR_long, aes(x=Month, y=Ppt, group=City)) +
+  geom_line(aes(color=City))+
+  geom_point(aes(color=City))
+```
+
+load data another dataset (openair.csv)
+```{r}
+air <- read.csv(file.choose(), header=TRUE)
+```
+
+Check it
+```{r}
+str(air)
+head(air)
+dim(air)
+```
+
+plot the figure
+```{r}
+plot(air$no2,type="l",    # type = "l" sets the line type to a line  
+     xlab="Time", ylab="Concentration (ppb)",
+     main="Time trend of Oxides of Nitrogen")
+```
+This plot is not great because the time dimension is meaningless - it's just 65.5K records!
+
+We need to make it conditional on another more informative variable
+```{r}
+plot(air$no2~as.Date(air$date,"%d/%m/%Y %H:%M"),type="l", # link to time to report sensible X axes labels
+     xlab="Time", ylab="Concentration (ppb)",
+     main="Time trend of Oxides of Nitrogen")
+```
+
+In this instance the labels are selected automatically. You can control this - see Cookbook if you're interested
+
+****************************************************************************
+IMPORTANT NOTE: is it worth looking at R's time and date functions if your *
+are going to be playing with time series data                              *
+Check out the lubridate package!                                           *    
+There is also a zoo library for time series work that helps with plotting  *
+****************************************************************************
+**********************************************************
+PART 2.4.1: Plotting multiple time series using lattice and ggplot 
+Derived from Gavin Simpson's elegant blog:
+http://www.fromthebottomoftheheap.net/2013/10/23/time-series-plots-with-lattice-and-ggplot/
+**********************************************************
+Now let's deal with a more complication example of multiple times series
+This is very likely in hydrological or climatological studies
+Key functions here are xyplot() and ggplot(); remember to list these and others on the Canvas pages in your group document
+
+Create some dummy time series data
+```{r}
+set.seed(1) # sets a seed for the simulation
+tdat <- data.frame(Site = rep(paste0("Site", c("A","B")), # creates site variables SiteA, SiteB
+                              each = 100),                #replicates this 100 times
+                   Date = rep(seq(Sys.Date(), by = "1 day", length = 100), 2), # creates a sample date from today; counts 100 days forward
+                   Fitted = c(cumsum(rnorm(100)))) # Creates fitted response trends via simulating a normal distribution
+tdat <- transform(tdat, Upper = Fitted + 1.5, Lower = Fitted - 1.5) # creates simulated 95% CIs
+head(tdat)
+str(tdat)
+```
+
+The new element we are introducing here is faceting using site as a conditioning variable
+Plot the time series using the Lattice package
+```{r}
+require(lattice)
+xyplot(Fitted + Upper + Lower ~ Date | Site, # uses xyplot y=Fitted, Upper,Lower and x = Date; faceted by Site
+       data = tdat, # tells lattice where to look for the data
+       type = "l", # aesthetics type = line
+       lty = c(1, 2, 2), # aesthetics (lty = line type); 1=solid; 2=broken
+       lwd = c(1, 1, 1),   # aesthetics (lwd = line width)
+       col.line = (c("Black","Red","Red"))) # col.line = line colour; ordered by specification in the call
+```
+You can beautify using axis labels and the like; have a play
+
+Plot the same series using gpplot2
+```{r}
+require(ggplot2)
+ggplot(tdat, aes(x = Date, y = Fitted, group = Site)) + #call formula
+  geom_line() +     # geom_linefor fitted uses defaults
+  geom_line(mapping = aes(y = Upper), lty = "dashed", colour = "red") + # change line type and colour
+  geom_line(mapping = aes(y = Lower), lty = "dashed", colour = "red") + # change line type and colour
+  facet_wrap( ~ Site)  # conditional by Site
+```
+You can beautify using axis labels and the like; have a play
+
+**********************************************************
+PART 2.5: Coplots to capture 3 or more variables         *
+This example has one conditioning variable               *
+Code from Zuur's beginners Guide                         *
+**********************************************************
+Coplots (or conditioning plots) allow you visualise 3 or more variables on one plot
+This is really useful for looking for interactions between variables (more on this in the linear techniques workshops)
+Key functions here is coplot(); remember to list these and others on the Canvas pages in your group document
+We'll use the Benthic data - no need to load it as it's in your workspace already
+IMPORTANT NOTE: if you get an error message about margins merely rescale the 
+graphic window in RStudio to make it bigger!
+
+```{r}
+coplot(Richness ~ NAP | as.factor(Beach), pch = 19,
+       ,xlab = "NAP", ylab = "Richness",
+       data = Benthic)
+```
+The ~ (tilde) operator indicates the x and y variables (you'll use it regression models, ANOVAs etc)
+The | operator makes the those conditional on another factor (in this case beach, which is coerced to a factor)
+Note you don't need the $ sign because coplot (like many other functions) has a data argument
+
+You can use the panel function in coplot to add things to the various panels (check the help files)
+Here we'll add a linear regression line
+```{r}
+panel.lm = function(x, y, ...) {
+  tmp <- lm(y~x,na.action=na.omit) 
+  abline(tmp, lwd = 2)
+  points(x,y, ...)}
+```
+panel.lm defines how the data should be displayed in each panel
+the three dots indicate additional functions will be used within the { brackets }
+lm creates a linear model of y ~ x and stores is object tmp; omitting NAs
+abline function draws the regression line
+points function plots the points
+
+Here's the plot
+```{r}
+coplot(Richness ~ NAP | as.factor(Beach), pch = 19,
+       ,xlab = "NAP", ylab = "Richness",
+       panel = panel.lm, data = Benthic)
+dev.off()
+```
+The only new bit of code is the panel call
+What we can infer from this that richness varies with beach (see different slopes and intercepts) 
+so beach must be added into any regression model (probably as a random factor!)
+
+
+Coplots using two conditioning variables
+Using pH data from an Irish study
+Load datafile (SDI2003.csv)
+```{r}
+pHEire <- read.csv(file.choose(), header=TRUE)
+```
+
+Check
+```{r}
+str(pHEire)
+head(pHEire)
+dim(pHEire) # there are 205 observations and 12 variables
+table(pHEire$Forested) # 46 are forest 159 are not
+```
+
+We're going to use pH and SDI which is a variable called Sodium Dominance Index (both are numeric)
+as x and y and; Forested (factor 1,2 = forest or not) and Altitude as conditioning variables
+because both pH and SDI should interact with both
+
+We log-transform the altitude variables and create a factor for Forested (as it's currently an integer)
+```{r}
+pHEire$LOGAlt <- log10(pHEire$Altitude)
+pHEire$fForested <- factor(pHEire$Forested)
+```
+
+We want regression lines so we'll use the same code as above
+```{r}
+panel.lm = function(x, y, ...) {
+  tmp <- lm(y~x,na.action=na.omit) 
+  abline(tmp, lwd = 2)
+  points(x,y, ...)}
+coplot(pH ~ SDI | LOGAlt * fForested,
+       panel=panel.lm,data=pHEire)
+```
+As log of altitude is a continuous variable we get overlapping bars (and panels)
+
+We can reduce the number of panels using the number argument
+```{r}
+coplot(pH ~ SDI | LOGAlt * fForested,
+       panel=panel.lm,data=pHEire, number=3)
+```
+This makes the plot much clearer
+You could add a fifth variable to the mix by colouring the points conditioned on temperature
+Have a read of Zuur's beginner's guide to see how that's done
+
+***********************************************************
+PART THREE: and introduction to spatial plotting          *
+***********************************************************
+3-d graphics example.....
+Modified from 'R in a nutshell' (Joseph Adler)
+
+```{r}
+install.packages("nutshell")
+require(nutshell) # the book package - you need to install it.
+```
+The data relate to a Digital elevation model of Yosemite national park in the US
+We are using base graphics in the main here
+More complex spatial representation of data uses other mapping packages within R
+These are the subject of a R CENTA module provided by colleagues at Leicester!! So be patient for those!!!
+
+```{r}
+data(yosemite)
+```
+
+have a look 
+```{r}
+head(yosemite)
+str(yosemite)
+```
+
+check dimensions of dataset - it should be 562 (rows) by 253 (columns)
+```{r}
+dim(yosemite)
+```
+
+We're going to start by creating a contour plot. The command contour is in base graphics 
+We use the asp function to ensure the aspect ratio fits the dims of the data
+
+```{r}
+contour(yosemite, asp = 253/562, ylim = c(1,0),
+        col = "blue")
+```
+addng extra complexity onto this we can draw a heatmap to represent the DTM using the image function
+
+the ylim function ensures that the data were plotted top to bottom
+```{r}
+image(yosemite, asp=253/562, ylim=c(1,0), col=sapply((0:32)/32, gray))
+```
+
+or in colour
+note we took the easy option and dropped the col function
+the default without it creates a heat map - higher is brighter elevations
+```{r}
+image(yosemite, asp=253/562, ylim=c(1,0))
+```
+
+now what about a 3-dimensional visualisation? We'll use persp to do this.
+create halfdome matrix organised as we need;
+select a square subset of the data using rightmost columns using [nrow and ncol]
+flip the perspective as the persp function plots y coordinates bottom to top but our coords plot top to bottom
+use seq function to do this
+```{r}
+halfdome <- yosemite[(nrow(yosemite) - ncol(yosemite) + 1):562,
+                     seq(from=253,to=1)]
+```
+
+now call the graphic using the persp function call
+image is rotated through 225 degrees using theta function
+the viewing angle is set to 20 degree via phi function (have a play with that)
+light source adjusted usin ltheta function set at 45
+finally we set the shade to .75 using shade function call
+```{r}
+persp(halfdome, col="red", border=NA, expand=.25,
+      theta=225, phi=20, ltheta=45, lphi=20, shade=.75)
+```
+HAVE a go at doing this in ggplot in your own time! It is a little easier!
+
+***********************************************************
+PART FOUR: Creating complex high quality graphics         *
+***********************************************************
+First attempt at a bubbleplot to visualise three variables on one graphic. 
+We'll use the symbols() funtion
+filename = Riv_hydrol.csv; We are going to compare the Mean discharge (Cumecs) with the range of discharge (Cumecs) with catchment area (Km2 = Fieldname = Carea)
+Key functions here is symbols()
+
+Load datafile
+```{r}
+Hydro <- read.csv(file.choose(), header=TRUE)
+```
+
+Check the data
+```{r}
+str(Hydro)
+head(Hydro)
+```
+
+Sort by order largest to smallest (see - before sort field) so the largest circles are plotted first
+```{r}
+Hydro_ord <- Hydro[order(-Hydro$Carea), ]
+```
+
+Create the first plot
+```{r}
+symbols(Hydro_ord$Ran, Hydro_ord$Max, Hydro_ord$Carea)
+```
+
+The trouble with this approach is that the circles for catchment size are proportional to the radius of the circle not the area of the circle
+This inflates the size of larger catchments givning a false picture of its importance
+So we need to scale the bubbles by area using the equation (Pi R squared)
+```{r}
+Radius <- sqrt(Hydro_ord$Carea / pi) #  creates a vector of square root the radiuses of each circle
+```
+
+Try again with appropriately sizes bubbles
+```{r}
+symbols(Hydro_ord$Ran, Hydro_ord$Mean, circles = Radius)
+```
+
+The problem now is that the smaller catchments are larger so we need to rescale the circles
+The default for the largest circle is one inch; the others are scaled relative to that
+We'll change the scaling using the inches argument in the symbols() function
+```{r}
+symbols(Hydro_ord$Ran, Hydro_ord$Mean, circles = Radius, inches = 0.5)
+```
+
+Now lets beautify the plot to make it publication ready
+```{r}
+par(las= 1) # Flip the Y axis labels to horizontal 
+symbols(Hydro_ord$Ran, Hydro_ord$Mean, circles = Radius, inches = 0.4,
+        xlab = "Mean Daily Discharge (Cumecs)", 
+        ylab = "Daily range in Discharge (Cumecs)", 
+        xlim = c(0, 600), ylim = c(0, 60),
+        fg = "White", bg = "Red")
+text(Hydro_ord$Ran, Hydro_ord$Mean, Hydro_ord$River, cex=0.5)
+
+```
+fg and bg arguments set the colour of the colour of the symbols; setting bg = "white" gives the whilte outline the text() function adds labels to the circles. text(X axis, Y axis, Label)
+Problem - very difficult to generate a legend......so easier to use ggplot
+
+create a bubblechart in ggplot2 - generates a legend (more) easily and let's add some more meaningful axis labels
+```{r}
+library(ggplot2)
+ggplot(Hydro_ord, aes(x=Ran, y=Mean, size=Carea, label=River)) + # sets graph parameters
+  geom_point(shape = 21, colour = "white", fill = "red") + # sets circle size and fill colours
+  scale_size_area("size") +
+  theme_bw(base_size = 18) + # override default theme to make it B/W
+  ylim(0, 60) + xlim(0, 600) + # set axis limits
+  ylab(expression(paste("Mean Daily Discharge ", "(", m^3, "/",s^-1,")", sep="")))+ # y axis labels
+  xlab(expression(paste("Mean Daily Discharge ", "(", m^3, "/",s^-1,")", sep="")))+ # x axis labels
+  labs(size=(expression(paste("Catchment Area ", "(",km^2,")")))) # Caption label
+```
+NOTE we removed the text in the bubbles because it obscures the patterns
+
+*********************************************************************************
+PART 5: MULTIPLE PLOTS using LOOPS (code from Zuur et al. Beginners Guide to R)*
+*********************************************************************************
+
+We're using a dataset Owls.txt that is based on begging behaviour of owl chicks when their parents return to the next with chicks
+There are 27 nests in the study 
+
+The first thing you need to do is figure out what you are trying to achieve. Here we want 27 scatterplots of chick begging behaviour. So firstly we need the code to create one plot from one nest before we can GENERALISE the procedure and create the loop.
+As always start by loading in the data and looking at it....
+Filename:Owls.txt
+
+```{r}
+Owls <- read.csv(file.choose(), header=TRUE)
+names(Owls)
+str(Owls)
+```
+
+We then need to know how many nests we have. Use the unique() function to do that.
+unique(Owls$Nest)
+
+Now start to generate the basic plotting code - we are using the nest called AutavauxTV:
+```{r}
+Owls.ATV<-Owls[Owls$Nest=="AutavauxTV",]   # subset function to use one nest only
+plot(x = Owls.ATV$ArrivalTime, y = Owls.ATV$NegPerChick,
+     xlab = "Arrival Time", ylab = "Negotiation behaviour",
+     main =  "AutavauxTV")
+```
+
+
+We need to repeat this a further 26 times to get the plot! You could paste it in 26 times and change the nest names but that is a waste of effort
+Lets start to generalise the code by using a generic Owls.i tag and passing this to the plot command
+```{r}
+Owls.i<-Owls[Owls$Nest=="AutavauxTV",]   # subset function to use one nest only
+plot(x = Owls.i$ArrivalTime, y = Owls.i$NegPerChick,
+     xlab = "Arrival Time", ylab = "Negotiation behaviour",
+     main =  "AutavauxTV")
+```
+
+but we still have the name in twice - so that lots of repeats. To avoid this we create a variable Nest.i that contains the name of the nest
+```{r}
+Nest.i <- "AutavauxTV"
+Owls.i <- Owls[Owls$Nest == Nest.i, ] # subsets the dataframe using the variable name in Nest.i
+plot(x = Owls.i$ArrivalTime, y = Owls.i$NegPerChick,
+     xlab = "Arrival Time", ylab = "Negotiation behaviour",
+     main =  Nest.i) # This code returns the name of the nest as the graph title
+```
+
+So now if you change the first line of code for another nest name you'll get a different plot
+```{r}
+Nest.i <- "Bochet"
+Owls.i <- Owls[Owls$Nest == Nest.i, ] # subsets the dataframe using the variable name in Nest.i
+plot(x = Owls.i$ArrivalTime, y = Owls.i$NegPerChick,
+     xlab = "Arrival Time", ylab = "Negotiation behaviour",
+     main =  Nest.i) # This code returns the name of the nest as the graph title
+```
+
+Now we can start to create plots PDFs - using save PDF (or jpeg, or TIFF). We can automatically name the output file using the paste() function.
+```{r}
+paste(Nest.i, ".pdf", sep = "")
+```
+
+We can then store this in a variable and use it in the pdf command
+```{r}
+Nest.i <- "Bochet"
+Owls.i <- Owls[Owls$Nest == Nest.i, ]
+YourFileName <- paste(Nest.i,".pdf",sep="")
+pdf(file=YourFileName) #Create the PDF
+plot(x = Owls.i$ArrivalTime, y = Owls.i$NegPerChick,
+     xlab = "Arrival Time", ylab = "Negotiation time",
+     main =  Nest.i)
+dev.off() #NOTE we need to turn off the graphics device after each plot!
+
+```
+YOU CANNOT SEE THE PLOT BECAUSE IT IS STORED AS A PDF IN YOUR WORKING DIRECTORY!!!
+
+We are almost there; one last task - a list of nest names using the unique() function.
+```{r}
+AllNests <- unique(Owls$Nest) # creates an object called "AllNests" with all the nest names
+
+```
+
+NOW here is the loop....it has to loop 27 times because we have 27 nests and want 27 plots.
+```{r}
+for (i in 1:27){
+  Nest.i <- AllNests[i]
+  Owls.i <- Owls[Owls$Nest == Nest.i, ]
+  YourFileName <- paste(Nest.i,".pdf",sep="")
+  pdf(file=YourFileName)
+  plot(x = Owls.i$ArrivalTime, y = Owls.i$NegPerChick,
+       xlab = "Arrival Time", ylab = "Negotiation time",
+       main =  Nest.i)
+  dev.off()
+}
+```
+Result  = 27 pdf files in your working directory.....and only a few lines of code!
+
+
+
+**********************************************************
+PART SIX: EXERCISES                                      *   
+**********************************************************
+****************************************************************************
+EXERCISE 1: barplots                                                       * 
+Use the cityrain.csv dataset (derived from R Graphics Cookbook)            *
+****************************************************************************
+1. Create a barplot comparing the four cities monthly rainfall (HINT: use par() function to sit one over the other;
+think about the X axis!!!)
+2. Modify the labels and create a title
+3. Set the bar for each month to a different colour
+4. Save the output as a PDF file
+
+****************************************************************************
+EXERCISE 2: boxplots                                                       * 
+Use the Deer.txt dataset                                                   *
+****************************************************************************
+Create boxplots to illustrate the difference between:
+1. Animal size v gender
+2. Change the default colour scheme, add labels to the axes
+3. Save it as jpeg file
+
+****************************************************************************
+EXERCISE 3: Scatterplots                                                   * 
+Use the Vegetation2.csv dataset                                            *
+****************************************************************************
+1. Plot a graph showing Species Richness against Exposed (BARESOIL)
+2. Add a linear trend line
+3. Save it as a Tiff file
+
+****************************************************************************
+EXERCISE 4: coplots                                                        * 
+Use the Vegetation2.csv dataset                                            *
+****************************************************************************
+1. Plot species richness versus any covariate you like conditional on transect
+2. Change the colour to powderblue
+3. Add a regression using the panel function
+4. Now swap the abline for a loess smoother 
+
+****************************************************************************
+EXERCISE 5: facetting                                                      * 
+Use the deep sea research data (ISIT.txt)                                  *
+****************************************************************************
+1. Use the Lattice package to plot depth v bioluminscence for each station. Read the help file to see how do this.
+2. Use ggplot to do the same thing. 

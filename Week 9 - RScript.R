@@ -1,0 +1,416 @@
+# ******************************************************************************
+# This is the source script for WEEK 9: Generalised Linear Modelling           *
+# ******************************************************************************
+# Jon Sadler March 2015 updated March 2021
+
+# Create a directory on your desktop called 'RWork' (or whatever you want) and download the data and script files from the Canvas website)
+
+# Normal run of start up commands
+
+# **************************
+# Setting the home directory
+setwd("~/Desktop/RWork")         # For Apple Macs
+setwd(c:\Desktop\Rwork)          # For Windows machines
+
+# **********************************************************************************************************************
+# Alternatively you can do this in RStudio by selecting "Session" then "Set Working Directory" then "Choose directory" *
+# **********************************************************************************************************************
+
+# PART ONE: Poisson Regression
+# We'll start with an example of poisson regression using multiple predictors that is not overdispersed!
+
+# Load data file gotelli.csv
+
+# Gotelli and Everson (2002) investigated the biographical determinants of at species richness at a regional scale
+# We're going to replicate their poisson regression of ant species richness against latitude, elevation and habitat type
+# Code here is from Logan (2012) with some modification by JPS
+# call the file gotelli or the rest of the code won't work!!!
+
+# Look at the structure  - you kow the commands by now......
+
+# Check the data structure using the scatterplotMatrix function in the car library
+require(car)
+scatterplotMatrix(~Srich+ ---------)
+
+# What does this show?!!!
+
+# Now check for inflation using VIFs. Run the model and look at the VIFs
+gotelli.glm <- glm(Srich ~ ---------, family = poisson, data  = ------)
+
+# VIFs
+vif(---------)
+
+# OUCH - big collinearity issues
+# The fix is to centre predictor variables. This is one of numerous ways of dealing with covariation.
+
+gotelli$cLatitude <- scale(gotelli$Latitude, scale = T)
+gotelli$cElevation <- scale(gotelli$Elevation, scale = T)
+
+# Rerun the VIF code with the new variables
+gotelli.glm <- glm(Srich ~ Habitat * ------- * --------, family = poisson, data  = gotelli)
+vif(gotelli.glm)  # They are bit high but okay so we'll go with it....
+
+# Check for influential data points outliers
+# first we'll use influence measures to do it....
+
+influence.measures(gotelli.glm)    # There are a couple of large cook values but they are not near 1!
+
+# graphically plot the Cooks distances
+plot(gotelli.glm, which = 4)  # few biggies but not too worrying
+
+# check for over dispersion 
+# this is the model deviance / degrees of freedom of the residuals
+gotelli.glm$deviance/gotelli.glm$df.resid
+
+# Rule of thumb here is that it needs to be around 1!
+# So we see it's okay not over dispersed
+ 
+# so everything is okay so look at the results
+summary(gotelli.glm)
+# We can infer from this that ant species is greater in forest
+# habitats than bogs (see first line)
+# and that it varies latitudinally
+
+# Lots of variables here so go for some model averaging....
+library(MuMIn)
+
+options(na.action=na.fail) # set options in Base R concerning missing values
+
+summary(model.avg(dredge(gotelli.glm), fit = TRUE, subset = TRUE))
+
+options(na.action = "na.omit") # reset base R options
+
+# Best model includes latitude, elevation and habitat
+# recreate the best model
+gotelli.glm <- glm(Srich ~ Habitat + Latitude + Elevation, family=poisson, data=gotelli)
+summary(gotelli.glm)
+
+# Check diagnostic plots
+op <- par(mfrow = c(2, 2))
+plot(gotelli.glm) # looking good
+par(op)
+
+# Then plot produce base plot (notice this is effectively and ANCOVA analysis)
+xs <- seq(40, 45, l = 1000)
+plot(Srich ~ Latitude, data = gotelli, xlab = "Latitude", ylab = "Ant Species Richness")
+# Plot the points and predicted trends
+points(Srich ~ Latitude, data = gotelli, subset = Habitat == "Forest", pch = 16)
+pred <- predict(gotelli.glm, type = "response", se = T, newdata = data.frame(Latitude = xs, Habitat = "Forest", Elevation = mean(gotelli$Elevation)))
+lines(pred$fit ~ xs)
+points(Srich ~ Latitude, data = gotelli, subset = Habitat == "Bog", pch = 21)
+pred <- predict(gotelli.glm, type = "response", se = T, newdata = data.frame(Latitude = xs, Habitat = "Bog", Elevation = mean(gotelli$Elevation)))
+lines(pred$fit ~ xs)
+legend("topright", legend = c("Forest", "Bog"), pch = c(16, 21), title = "Habitat", bty = "n")
+box(bty = "l")
+
+#EXERCISE: Recreate this plot using ggplot. 
+#This is trickier than you'd imagine. 
+#There is code to do this in the next example - but have a think first before you use it!
+
+ggplot(-----------)
+
+# PART TWO: over dispersion, quasi-poisson and negative binomial models
+# Now what do we do if the model is overdispersed?
+# We’re going to use a dataset on amphibian roadkills (from Zuur et al. 2009). It has 17 explanatory 
+# variables. We’re going to use nine of them and the response variable is TOT.N (the total number of 
+# kills).
+# The dataset is called RoadKills.csv
+
+# Load the data and do the normal run of look sees - i.e. exploration - call the file Road please!!
+
+# look at the structure
+glimpse(--------)
+
+# Plot......
+plot(Road$D.PARK,Road$TOT.N,xlab="Distance to park",
+     ylab="Road kills")
+
+# You can clearly see decreasing variability of kills with distance.
+# Highly likely they'll be hetergeneity in the residuals
+
+Road.glm1<-glm(TOT.N~D.PARK,family=poisson,data=Road)
+summary(Road.glm1)
+
+MyData=data.frame(D.PARK=seq(from=0,to=25000,by=1000))
+G<-predict(Road.glm1,newdata=MyData,type="link",se=T)
+F<-exp(G$fit)
+FSEUP<-exp(G$fit+1.96*G$se.fit)
+FSELOW<-exp(G$fit-1.96*G$se.fit)
+lines(MyData$D.PARK,F,lty=1)
+lines(MyData$D.PARK,FSEUP,lty=2)
+lines(MyData$D.PARK,FSELOW,lty=2)
+
+#Recreate using ggplot
+ggplot(Road,aes(x=D.PARK,y=TOT.N)) + geom_point()+geom_smooth(se = FALSE, method = "glm", formula = y ~ x)
+
+# Now add in more covariable and see what happens
+Road.glm2 <- glm(TOT.N ~ OPEN.L + MONT.S + POLIC +
+         SHRUB + WAT.RES + L.WAT.C + L.P.ROAD +
+         D.WAT.COUR + D.PARK,family=poisson,data=Road)
+summary(Road.glm2)
+
+# Check for collinearity using VIFs
+vif(Road.glm2)			# Looks okay...... 
+
+options(na.action=na.fail) # set options in Base R concerning missing values
+summary(model.avg(dredge(Road.glm2), fit = TRUE, subset = TRUE)) # Be patient this might take a bit longer to process!!!
+# This indicates the full model is the best! A bit unlikely.....
+options(na.action = "na.omit") # reset base R options
+
+# check for over dispersion - recall we are looking for values around 1 (i.e. certainly not over 2 nor under 0.5)
+# this is the model deviance / degrees of freedom of the residuals
+Road.glm2$deviance/Road.glm2$df.resid
+# This doesn't look good....way over 2!
+
+# Check diagnostic plots
+op <- par(mfrow = c(2, 2))
+plot(Road.glm2) # There is a wedge shape in the fitted residuals and some high values....
+par(op)			# So we have some problems
+
+# if we ignore the over dispersion we get a lot of significant covariates....
+# So how do we deal with it. Adding lots of covariates didn't work....
+
+# try another error structure......
+Road.glm3 <- glm(TOT.N ~ OPEN.L + MONT.S + POLIC +
+         SHRUB + WAT.RES + L.WAT.C + L.P.ROAD +
+         D.WAT.COUR + D.PARK,family=quasipoisson,data=Road)
+summary(Road.glm3)
+
+# Notice we've accounted for the dispersion but it still sits a 5.9 or so and we've got fewer
+# significant covariables
+
+# so proceed to model selection - we cannot do this using MuMIn so we adopt the drop1 approach
+# we cannot use step because quasi-poisson models don't produce AIC values
+# We throw out the least significant term and repeat the model
+Road.glm4 <- update(Road.glm3, .~. -D.WAT.COUR)
+summary(Road.glm4) # still have terms that are not significant - drop POLIC
+
+Road.glm5 <- update(Road.glm4, .~. -POLIC)
+summary(Road.glm5) # still have terms that are not significant - drop L.P.ROAD 
+
+Road.glm6 <- update(Road.glm5, .~. -L.P.ROAD)
+summary(Road.glm6) # still have terms that are not significant - drop WAT.RES 
+
+Road.glm7 <- update(Road.glm6, .~. -WAT.RES)
+summary(Road.glm7) # still have terms that are not significant - drop OPEN.L 
+
+Road.glm8 <- update(Road.glm7, .~. -OPEN.L)
+summary(Road.glm8) # still have terms that are not significant - drop OPEN.L 
+
+# We finally end up with a model with way fewer significant terms
+
+# Check diagnostic plots
+op <- par(mfrow = c(2, 2))
+plot(Road.glm8) # There is a wedge shape in the fitted residuals 
+par(op)			# So we still have some problems
+
+# Last option...a negative binomial model....needs a different library
+require(MASS)
+Road.nb1 <- glm.nb(TOT.N ~ OPEN.L + MONT.S + POLIC +
+         SHRUB + WAT.RES + L.WAT.C + L.P.ROAD +
+         D.WAT.COUR + D.PARK, link = "log", data=Road)
+summary(Road.nb1)
+
+# We have a number of non-significant terms so start model selection
+# We have an AIC because we used a log link function so MuMIn should work
+
+options(na.action=na.fail) # set options in Base R concerning missing values
+summary(model.avg(dredge(Road.nb1), fit = TRUE, subset = TRUE))
+options(na.action = "na.omit") # reset base R options
+# our best model includes varaibles 1,3,4 and 6 or 1,4 and 6. We go for the latter
+# refit the model....
+Road.nb2 <- glm.nb(TOT.N ~ OPEN.L + L.WAT.C + D.PARK, link = "log", data=Road)
+summary(Road.nb2)
+
+# Check diagnostic plots
+op <- par(mfrow = c(2, 2))
+plot(Road.nb2) # no patterns....
+par(op)	
+
+#We can use ggfortify for glm objects too
+autoplot(Road.glm8, which = 1:6, ncol = 2, label.size = 3,
+         colour = "steelblue") + theme_bw()
+
+# Which model is best..... the negative binomial one because there are no patterns in the residuals
+
+# PART THREE: Logistic Regression
+# We are going to use a dataset on spiders for this analysis
+# Polis et al. (1998) recorded island characteristics in the Gulf of California
+# Quinn and Keough (2002) used those data to model presence/absence of a spider predator
+# against the perimeter to area ratio of the islands to illustrate logistic regression.
+# We're repeating this but using the code from Logan's book
+
+# Import the data call it spider / check structure etc
+
+
+# Visualise the data 
+table(spider$PA)
+
+op <- par(mfrow = c(2, 1))
+boxplot(RATIO ~ PA, data = spider, 
+	col = "red", xlab = "Presence / Absence of Uta lizards",
+	ylab = "Island Ratio")
+plot(PA ~ RATIO, pch = 19, data = spider)
+par(op)	
+
+#Visualise the data in ggplot
+ggplot(-------,aes(x=-------, y=-------)) + geom_boxplot + labs(x = "Presence / Absence of Uta lizards", y="Island Ratio")
+
+# run model
+spider.glm <- glm(PA~RATIO, family=binomial, data=spider)
+
+# Establised wisdom indicates that you don't need to bother with over dispersion in logistic regression on presence/absence data (but see Zuur et al. 2013 for a fuller discussion). We'll look at it anyway...
+
+# check for over dispersion 
+# this is the model deviance / degrees of freedom of the residuals
+spider.glm$deviance/spider.glm$df.resid
+# It's okay but slight under dispersed. If it were near 0.5 we'd need to deal with that.
+
+# we do need to worry about the linear fit of odds ratio though
+# we'll use a component+residual plot to look at this
+
+crPlots(spider.glm, ask = FALSE) # looks pretty good
+
+# Check for influential values
+influence.measures(spider.glm) # no issues
+
+# And Cooks distance
+plot(spider.glm, which = 4) 
+# This is dancing on the margin at (0.8). Logan is okay with it.
+# I'd remove it.....but we'll plough on.
+
+# And Cooks distance in ggplot using autoplot
+autoplot(-----------, which = 4, ncol = 2, label.size = 3,
+         colour = "steelblue") + theme_bw()
+
+#look at it
+summary(spider.glm)
+# 
+# check residuals....
+op <- par(mfrow = c(2, 2))
+plot(spider.glm)   # yuk....almost impossible to interpret so one one bothers!!!
+dev.off()
+
+
+# plot and predict
+# Calculate predicted values based on fitted model
+xs<-seq(0,70,l=1000)
+spider.predict <- predict(spider.glm, type="response", se=T, newdata=data.frame(RATIO=xs))
+# Produce base plot
+plot(PA~RATIO, data=spider, xlab="", ylab="", axes=FALSE, pch=16)
+# Plot fitted model and 95% CI bands
+points(spider.predict$fit~xs, type="l", col="gray")
+lines(spider.predict$fit+spider.predict$se.fit ~ xs, col="gray", type="l", lty=2)
+lines(spider.predict$fit-spider.predict$se.fit ~ xs, col="gray", type="l", lty=2)
+# Axes titles
+mtext(expression(paste(italic(Uta), " presence/absence")), 2, line=3)
+axis(2,las=1)
+mtext("Perimeter to area ratio",1, line=3)
+axis(1)
+box(bty="l")
+
+# Check odds ratio to estimate probabilty of presence given unit increases in perimeter / area ratio
+
+## odds ratios only
+exp(coef(spider.glm))
+
+## odds ratios and 95% CI
+exp(cbind(OR = coef(spider.glm), confint(spider.glm)))
+# So we can conclude likelihood of lizard presence declines by approximately 20% (1-0.803)
+# for every unit increase in perimeter/area ratio on the islands
+
+# Estimate R2 value
+1 - (spider.glm$dev / spider.glm$null)
+# So 45.9% of the variation in the data is captured by the regression equation
+
+#Let's conclude with an example of multiple logistic regression
+#Data are derived from Bolger et al. (1997) study of habitat fragmentation on rodent pops
+#response = presence/absence of rodents
+#explanatories - area of canyon fragment, % cover of shrub, distance to nearest canyon
+
+#Import the data
+
+bolger <- ---------------
+  
+# Look at it
+glimspe(bolger)
+
+# Investigate collinearity with a scattermatrixlibrary(car)
+scatterplotMatrix(--------)
+#No issues suggested
+
+#and some VIFs
+bolger.glm <- glm(RODENTSP ~ DISTX + AGE + PERSHRUB, family = binomial, data = bolger)
+vif(bolger.glm)
+
+# All below 3 so fine
+
+#Now estimate the dispersion parameter
+bolger.glm$deviance/bolger.glm$df.resid
+#No issue here either.....
+
+#Confirm log odds ratio linearity
+crPlots(bolger.glm)
+#No significantly worrying problems - age not great. Note potential outliers on Distx and age. We could look more closely at those....
+
+#Check for influential sample points
+influence.measures(bolger.glm)
+
+#graphically plot the Cooks distances
+
+autoplot(-------) 
+#Remember to use the which=4 command to get the correct figure
+#Data point 19 is high but not 1. 
+#I'd still probably remove it but let's plough on
+
+#Run the model and interpret it...
+summary(bolger.glm)
+#So the probability of rodent occurrence increases 
+#with % shrub cover but not age since isolation or distance to nearest canyon 
+#fragment
+
+#Check the log odds ratio and interpret that..
+#odds ratios and 95% CI
+
+exp(coef(bolger.glm))
+#the chances of rodent presences increases slightly (10%)
+# for every 1% increase in shrub cover. NOTE this is because 1.10 > 1.00
+
+#Do some model selection
+#We have an AIC because we used a log link function so MuMIn should work
+
+options(na.action=na.fail) # set options in Base R concerning missing values
+summary(model.avg(dredge(bolger.glm), fit = TRUE, subset = TRUE))
+# Best model only includes percentage shrub cover
+options(na.action = "na.omit") # reset base R options
+
+#Refit the best model 
+bolger.glm <- glm(RODENTSP ~ PERSHRUB, family = binomial, data = bolger)
+summary(bolger.glm)
+
+#Create the plot to summarise the relationship - use the predict function
+#Calculate predicted values based on fitted model
+
+xs<-seq(0,100,l=1000)
+bolger.predict <- with(bolger, (predict(bolger.glm, type="response", se=T, newdata=data.frame(DISTX=mean(DISTX), AGE=mean(AGE), PERSHRUB=xs))))
+# The mean argument sets means for the non-significant terms as constant
+# The response argument plots on the original scale as the it is a log link function
+# Produce base plot
+plot(RODENTSP~PERSHRUB, data=bolger, xlab=NA, ylab=NA, axes = FALSE, pch=16)
+
+# Plot fitted model and 95% CI bands
+points(bolger.predict$fit~xs, type="l", col="gray")
+lines(bolger.predict$fit+bolger.predict$se.fit ~ xs, col="gray", type="l", lty=2)
+lines(bolger.predict$fit-bolger.predict$se.fit ~ xs, col="gray", type="l", lty=2)
+# Axes titles
+mtext("Native rodent presence/absence", 2, line=3)
+axis(2,las=2)
+mtext("Percentage shrub cover",1, line=3)
+axis(1)
+box(bty="l")
+
+#Try repeating this plot with ggplot.....
+#you'll need to use geom_smooth with the following arguments 
+#(method = "glm", method.args = list(family = "binomial")
+                                                                                                     ```{r}
+                                                                                                     ``

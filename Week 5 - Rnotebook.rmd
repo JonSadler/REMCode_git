@@ -1,0 +1,755 @@
+---
+title: "Week 5: Linear Regression"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+************************************************************************************
+This is the source script for WEEK 5: Linear Regression+ model validation + ANCOVA *
+************************************************************************************
+Jon Sadler Feb 2014 updated Feb 2021
+
+Set the home directory: whatever methods suits you.
+
+BACKGROUND:
+So this is basically ANOVA but using a line so all the same assumptions hold....<think about what they are>
+But additionally we need to know if the data are linearly structured...to do this well make a picture
+
+We are going to this basic workflow for data analysis, and stick to Plot -> Model -> Check Assumptions -> Interpret -> Plot Again (SEE FLOWCHART in the comparing means lecture!!!), you will have a very solid and efficient foundation for using R. Effective pictures / visualisation is the key to communicating your findings. 
+
+Load compensation.csv datafile from Beckerman and Petchey's book.....see readings
+
+```{r}
+Growth <- ................
+```
+
+We can introduce a new way of looking at the data files using the glimpse function (from Tidyverse in the dplyr library)
+
+```{r}
+library(tidyverse)
+glimpse(-------)
+```
+it lists the structure like the str() function
+
+now let's plot it using R base plot() function; we're interested in knowing whether
+Root biomass (Root) has an influence or correlates with Fruit production (Fruit)
+
+```{r}
+plot(Growth$-----, -----$------)
+```
+Notice we're using the filename and $ operator to indicate the variables and that Y (response variable comes last)
+
+A better and more intuitive way to do it uses the data = argument
+```{r}
+plot(Fruit ~ Root, data = Growth) # This fits the model specification for aov and linear models
+```
+
+So we can see that the relationship looks linear! But also that it has two components. Let's tidy it up (or pimp it as Beckerman and Petchey would say)
+
+Add some axis labels and you can vary their size using the list(cex combination of arguments)
+```{r}
+plot(Fruit ~ Root, data = Growth,
+	xlab = list("Root Biomass",cex = 1.5), # add half to the size of the default font
+	ylab = list("Fruit Production",cex = 0.5)) # halves the default font
+```
+Now let's consider the points on the graph
+?par gives you help on the graphics parameters
+?points specifically on the points.
+
+```{r}
+plot(Fruit ~ Root, data = Growth,
+	xlab = list("Root Biomass",cex = 1), # reset size to default of 1
+	ylab = list("Fruit Production",cex = 1), # reset size to default of 1
+	cex = 2, pch = 21, bg = "grey") # the pch argument controls the type 21 = filled circle, bg = colour.
+```
+You can see that there are two clusters of points here relating to the treatment - so let's explore that.
+It would be instructive to give them different colours to illustrate the patterns.
+
+First let's create an object that tags the colours using an ifelse() function = if / else
+```{r}
+culr <- ifelse(Growth$Grazing == "Grazed", "green", "blue")
+```
+look at the object you've created
+```{r}
+culr
+```
+
+to add the colours just substitute the object name into the colour argument
+
+```{r}
+plot(Fruit ~ Root, data = Growth,
+	xlab = list("Root Biomass",cex = 1), # reset size to default of 1
+	ylab = list("Fruit Production",cex = 1), # reset size to default of 1
+	cex = 2, pch = 21, bg = culr) # add culr object to the bg call
+```
+
+now let's finish the graphic by adding a legend
+```{r}
+plot(Fruit ~ Root, data = Growth,
+	xlab = list("Root Biomass",cex = 1), # reset size to default of 1
+	ylab = list("Fruit Production",cex = 1), # reset size to default of 1
+	cex = 2, pch = 21, bg = culr) # add culr object to the bg call
+legend("topleft", legend = c("Grazed", "Ungrazed"),
+	pch = 21, pt.bg = c("Green", "Red"), pt.cex = 2)
+```
+
+```{r}
+library(ggplot2)
+ggplot(-----, aes(x=-----, y=-----, colour = -----)) + geom_point() +
+  labs(title = "", x = "Root Biomass", y = "Fruit Production")
+```
+
+
+**************************************************
+CLASS exercise: create a high quality plot      *
+Datafile: Nelson.csv                            *
+**************************************************
+
+First linear regression output
+use the Nelson.csv data
+This is an experiment on 9 batches of flour beetles assessing their weight loss measued in mg at different humidity levels ranging from 0-93% humidity
+The experiment lasted 6 days
+
+Load data (you should have already done this)
+
+```{r}
+Flour <- ---------
+```
+
+Examine its structure
+```{r}
+glimpse(Flour)
+```
+
+Draw some pictures to assess linearity. Use the plot command to compare weight loss against humidity 
+```{r}
+plot(------ ~ -------, data = Flour,
+	xlab = "% Humidity",
+	ylab = "Beetle weight loss (mg)",
+	pch = 21, col = "blue", bg = "blue"
+```
+
+check a few assumptions
+
+QQ-plot for normality. HINT: remember Y axis variable is WEIGHTLOSS (sample = ) and data file = Flour
+```{r}
+ggplot(aes(sample = ------), data = -----) + stat_qq() +
+  stat_qq_line()
+```
+
+Check variability using some interesting graphics available in the car package
+
+load package car - library of require. Install it if you get an error
+```{r}
+-----------
+```
+
+Now use the scatterplot command from car....it's pretty useful
+```{r}
+scatterplot(WEIGHTLOSS ~ HUMIDITY, data = Flour,
+	xlab = "% Humidity",
+	ylab = "Beetle Weight loss (mg)")
+```
+
+The boxplot indicate normal distribution of data - it's quite symmetrical
+There is no indication of increasing spread of measured points around the green linear regression line
+So we can assume homogeneity of variance is likely....
+
+Run your first linear model using the lm() function from base R
+```{r}
+Flour.lm <- lm(WEIGHTLOSS ~ HUMIDITY, data = Flour)    # don't mix up your response and explanatory variables!
+```
+
+Look at the output
+```{r}
+summary(Flour.lm)   # refer to lecture PDF to see what the numbers mean i.e. for interpretation
+anova(Flour.lm)     # lists the tests on the data of response to explanatory
+```
+
+So what does this show us?
+First we see our model call usig the lm() function
+Then we have the spread of residuals lists from min (generally a -ve) to positive 
+The coefficients are listed next. The intercept estimate (~8.7) is the point that the regression line passes ths Y axis. Then we have the standard  error, a T value and a significance level Pr (note it's highly significant).
+The next line is your explanatory variable in this case HUMIDITY. The estimate this time is the slope of the line (it's a negative so is slopes down from left to right); the we have the same other elements. Note it is highly significant too.
+The next table is the ANOVA table and it shows that the covariate is highly significant using 1 df (there is only one covariate). And you have 7df of residuals. Which is 8-1.
+
+
+Let' look at the model more carefully by analysing the objects (see top left panel in RStudio)
+Or just type:
+```{r}
+names(Flour.lm)
+coef(Flour.lm) # show the intercept and slope values (or the betas)
+residuals(Flour.lm)   # shows the residuals or errors for the fitted values fitted.values(Flour.lm)
+```
+You can call through and use all of these objects for other things
+
+Recreate the plot with a regression line
+
+Draw some pictures to assess linearity - you've plotted this so you can see it is!
+```{r}
+plot(WEIGHTLOSS ~ HUMIDITY, data = Flour,
+	xlab = "% Humidity",
+	ylab = "Beetle weight loss (mg)",
+	pch = 21, col = "blue", bg = "blue")
+	abline(Flour.lm) # add the line using the abline() function
+```
+
+Now let's use the model to do something - i.e. prediction
+First we'll calculate the confidence intervals
+
+```{r}
+confint(Flour.lm)
+```
+Now we'll predict the mean beetle weight expected at 25%, 50%, 75% and 100% humidity levels
+These were not measured so it's a prediction using the regression equation
+weightloss - -0.053 + 8.704
+
+```{r}
+predict(Flour.lm, data.frame(HUMIDITY = c(25, 50, 75, 100)),  # tells it what data you want 25% etc
+	interval = "prediction", se = T) # uses a prediction interval and sets standard errors to TRUE
+```
+
+To complete the analysis we predict across the dataset and create a new plot with regression equation, r-squared and line and CIs at 95%
+
+Recreate your plot (version 1)
+WORK CAREFULLY THROUGH THIS CODE CHUNK.....
+
+```{r}
+plot(WEIGHTLOSS ~ HUMIDITY, data = Flour,
+	xlab = "% Humidity",
+	ylab = "Beetle weight loss (mg)",
+	pch = 21, col = "grey", bg = "grey", axes = F) # We've turned off the default axes so need to recreate them
+# You don't need to turn them off - the predicted values and CIs will work with default values (see below)
+# Add x axis and reduce axis labels a little (i.e. the number on the axis not the axis label!)
+axis(1, cex.axis = 0.8)
+# Add the Y axis in a similar manner using horizontal tick labels
+axis(2, las = 1)
+# add the regression line from the model (Flour.lm) using abline.....
+abline(Flour.lm, col="black")
+# add the equation
+text(98,9, "WEIGHTLOSS = -0.053HUMIDITY + 8.704", pos = 2)
+# add r-square value
+text(98,8.6, expression(paste(R^2 == 0.9078)), pos = 2) # add in text using the expression/paste functions
+# create a sequence of 1000 number spanning the range of humidities (min to max)
+x <- seq(min(Flour$HUMIDITY), max(Flour$HUMIDITY), l=1000)  # notice this is an 'l' = length. NOT a 1!!!!!!!
+#for each value of x, calculate the upper and lower 95% confidence
+y<-predict(Flour.lm, data.frame(HUMIDITY=x), interval="c")
+#plot the upper and lower 95% confidence limits
+matlines(x,y, lty=3, col="black") # This function add the CIs, lty = line type (dashed)
+#put an L-shaped box to complete the axis
+box(bty="l") # rather than a square which is the default
+```
+
+# Recreate your plot (version 2) - I actually prefer this version!
+```{r}
+# Recreate your plot (version 2) - I actually prefer this version!
+plot(WEIGHTLOSS ~ HUMIDITY, data = Flour,
+     xlab = "% Humidity",
+     ylab = "Beetle weight loss (mg)",
+     pch = 21, col = "grey", bg = "grey") # We've left the axes on
+# add the regression line from the model (Flour.lm) using abline.....
+abline(Flour.lm, col="black")
+# add the equation
+text(98,9, "WEIGHTLOSS = -0.053HUMIDITY + 8.704", pos = 2)
+# add r-square value
+text(98,8.6, expression(paste(R^2 == 0.9708)), pos = 2) # add in text using the expression/paste functions
+# create a sequence of 1000 number spanning the range of humidities (min to max)
+x <- seq(min(Flour$HUMIDITY), max(Flour$HUMIDITY), l=1000)  # notice this is an 'l' = length. NOT a 1!!!!!!!
+#for each value of x, calculate the upper and lower 95% confidence
+y<-predict(Flour.lm, data.frame(HUMIDITY=x), interval="c")
+#plot the upper and lower 95% confidence limits
+matlines(x,y, lty=3, col="black") # This function add the CIs, lty = line type (dashed)
+```
+
+# PLOT IT USING ggplot....
+
+```{r}
+library(ggplot2)
+```
+
+```{r}
+ggplot(Flour, aes(x = HUMIDITY, y = WEIGHTLOSS)) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red") # USING LM call. You can pass the model predicts through as well but this is way more simple
+```
+More straightforward and you get the CIs for free!
+
+```{r}
+# add text using this function....from:
+# https://susanejohnston.wordpress.com/2012/08/09/a-quick-and-easy-function-to-plot-lm-results-in-r/
+ggplotRegression <- function (fit) {
+   require(ggplot2)
+  ggplot(fit$model, aes_string(x = names(fit$model)[2], y = names(fit$model)[1])) +
+    geom_point() +
+    stat_smooth(method = "lm", col = "red") +
+    labs(title = paste("Adj R2 = ",signif(summary(fit)$adj.r.squared, 5),
+                       "Intercept =",signif(fit$coef[[1]],5 ),
+                       " Slope =",signif(fit$coef[[2]], 5),
+                       " P =",signif(summary(fit)$coef[2,4], 5)))
+}
+```
+NOTE: function only works for linear models without factors! And it uses the adjusted R2 (adj.r.squared)
+
+```{r}
+fit1 <- lm(WEIGHTLOSS ~ HUMIDITY, data = Flour)
+ggplotRegression(fit1)
+```
+
+You can paste in text using annotate too in ggplot - it's easier:
+```{r}
+p <- ggplot(Flour, aes(x = HUMIDITY, y = WEIGHTLOSS)) +
+  geom_point() +
+  stat_smooth(method = "lm", col = "red")
+p + annotate("text", x = 75, y = 9, label = "WEIGHTLOSS = -0.053HUMIDITY + 8.704") +
+  annotate("text", x = 59, y = 8.6, label = "R2 = 0.9975")
+```
+
+NOTE: x and y relate to the scale on the plots! Very useful. x = midpoint of text.
+
+*****************
+MODEL VALIDATION*
+*****************
+
+Now let's look at model validation
+We're going to do this visually although you can use the tests we introduced last week and earlier
+To start we'll use simulated data to do this, based on post at:
+http://stats.stackexchange.com/questions/52089/what-does-having-constant-variance-in-a-linear-regression-model-mean/52107#52107
+
+There is a R blogger post on this as well (not for the faint hearted):
+http://www.r-bloggers.com/model-validation-interpreting-residual-plots/
+
+```{r}
+set.seed(5) # use R's simulation tools
+N  = 500 # 500 data points
+b0 = 3 # set b0 or the intercept
+b1 = .4 # set the slope or B1
+
+s2 = 5 				# variance parameter
+g1 = 1.5			# seed for heterogeneous variability
+g2 = .015			# ditto
+
+x        = runif(N, min=0, max=100) # create x
+y_homo   = b0 + b1*x + rnorm(N, mean=0, sd=sqrt(s2            )) # groups points around the line
+y_hetero = b0 + b1*x + rnorm(N, mean=0, sd=sqrt(exp(g1 + g2*x))) # increase variability in Y with measured X
+```
+
+First we compare raw data
+
+```{r}
+op <- par(mfrow = c(1, 2))     # 1 row and 2 columns and allocates it to object op
+plot(y_homo ~ x)
+plot(y_hetero ~ x)
+# Indicate a likely problem as Y increases with measured X on the right hand plot
+par(op) # sets graphics back to default without shutting the graphics device (unlike dev.off())
+```
+
+SEE HOW VARIABLE X IN THE HETEROGENEOUS EXAMPLE INCREASES IN RESIDUAL SPREAD WITH INCREASING X?
+
+Now let's track that through to the models using a basic linear model. Create the linear models:
+```{r}
+mod.homo   = lm(y_homo~x)
+mod.hetero = lm(y_hetero~x)
+```
+
+Plot and compare the two models
+```{r}
+#look at the plots
+op <- par(mfrow = c(1, 2))     # 1 row and 2 columns
+plot(mod.homo$resid ~ mod.homo$fitted.values, main = "Homoscedastic")
+plot(mod.hetero$resid ~ mod.hetero$fitted.values, main = "Heteroscedastic")
+par(op)
+```
+The we can clearly see a wedge shape - left to right on the right hand plot
+
+And the same with a Scale-Location plot (or standardised residuals)
+
+```{r}
+op <- par(mfrow = c(1, 2))     # 1 row and 2 columns
+plot(rstandard(mod.homo) ~ mod.homo$fitted.values, main = "Homoscedastic")
+plot(rstandard(mod.hetero) ~ mod.hetero$fitted.values, main = "Heteroscedastic")
+par(op)
+```
+
+Let's repeat this with a field dataset......
+Load a new dataset mussel.csv
+data are derived from Peake and Quinn (1993) and analyse in Quinn and Keough 2002 and Logan 2010
+The study investigated abundance-area effects for invertebrates living in mussel beds in intertidal areas
+25 mussel beds
+respone = number of invertebrates (INDIV)
+Explanatory = the area of each clump (AREA)
+additional possible response - Species richness of invertebrates (SPECIES)
+Logan models abundance in his book but we're going to look at species richness
+
+load data file
+```{r}
+Mussel <- -------
+```
+
+Look at it
+```{r}
+str()
+View()
+```
+
+Check it using the car scatterplot function.....
+```{r}
+scatterplot(SPECIES ~ AREA, data = Mussel)
+```
+This indicates that the data are not normally distributed (especially AREA)
+The species richness data don't look too good either. Peaked in the middle.
+
+Let's fit a linear model nonetheless just to chase it through to validation. Looking at the scatterplot I'd have gone to analyse it differently but it is important for you to see 
+
+```{r}
+mussel.lm <- lm(SPECIES ~ AREA, data = Mussel)
+summary(mussel.lm)
+```
+
+Now check assumption by using R's inbuilt model validation plot defaults
+set graphics parameters because we want all the plots on one graphic
+Plot the diagnostics
+```{r}
+op <- par(mfrow = c(2, 2))  # this gives us a 2 x 2 panel with four images and allocates it to object op
+plot(mussel.lm)
+par(op)    # turns graphics device back to default of one plot per page!
+```
+Residuals v Fitted indicate a problem. It's wedge shaped and humped!
+qqplot is a bit dodgy but might is okay
+Scale-Location plot is variable
+Cook distance / leverage looks okay - no massive outliers (ie. cooks distances >1)
+
+FINAL VALIDATION TASK - residuals against explanatory variable
+
+```{r}
+plot(mussel.lm$resid ~ Mussel$AREA,
+	xlab = "Mussel bed Area",
+	ylab = "Residuals")
+```
+
+This indicates a few large values and a slight wedge due to numerous small patches
+So what do we do?
+I am not a fan of this - we'll look at other approaches next week!
+
+
+We can validate the data in a ggplot environment too as we did last week
+```{r}
+library(ggfortify)
+autoplot(mussel.lm)
+```
+
+So what do we do?
+We can linearise the variables by transforming them and re-run the model
+I am not a fan of this - we'll look at other approaches next week!
+
+```{r}
+mussel.lm1 <- lm(SPECIES ~ log10(AREA), data = Mussel)
+```
+
+notice I chose not to log the response as it looked okay in the qqplot check the results
+```{r}
+summary(mussel.lm1)
+```
+look at the differences between this and unvalidated model in terms of R-square etc
+
+Validate the model
+```{r}
+op <- par(mfrow = c(2, 2))  # this gives us a 2 x 2 panel with four images...
+plot(mussel.lm1)
+par(op)
+```
+These look okay…..so we accept the model and should tabulate the results
+
+FINAL VALIDATION TASK - residuals against explanatory variable
+```{r}
+plot(mussel.lm1$resid ~ log10(Mussel$AREA),
+	xlab = "Log10 of Area",
+	ylab = "Model residuals")
+```
+
+Instead of using a log to sort out the area variable we could try and simulate the hump in the variable by fitting a polynomial model to it;
+
+```{r}
+mussel.lm2 <- lm(SPECIES ~ AREA + I(AREA^2), data = Mussel) 		# I(AREA^2) fits the 2nd order polynomial
+```
+This uses the I function to fit a quadratic to it.
+
+Check the results....
+```{r}
+summary(mussel.lm2)
+```
+
+validate the model
+```{r}
+library(ggfortify)
+autoplot(mussel.lm2)
+```
+Not as good as the log10 model in terms of these plots
+However, area effects are normally better modelled using a power model in the form of y = x^be
+We'll revisit this next week
+
+Just for completeness there  are SIX inbuilt validation plots
+You can call these individually using the 'which' argument within plot (my model object name)
+So here they are all six in one plot
+
+```{r}
+op <- par(mfrow = c(2, 3))  # this gives us a 2 x 3 panel with six images...
+plot(mussel.lm1, which = 1) 	# residual v fitted
+plot(mussel.lm1, which = 2) 	# Normal Q-Qplot
+plot(mussel.lm1, which = 3)		# Scale-Location plot
+plot(mussel.lm1, which = 4)		# Cook's Distance by observation (sample number). Some texts state D of >1 are an issue but we need to be more conservative
+```
+So we can use 4/(N−k−1), where N is the number of observations and k the number of explanatory variables
+
+What cook values are okay? using 4/(N−(k−1))
+4/length(Mussel$INDIV) # K-1 in this case is 1-1 = 0 (as we only have one explanatory variable)
+# 0.16 is threshold so observation is 21 might be an issue....I'd be tempted to leave it in. Not a huge issue.
+
+```{r}
+op <- par(mfrow = c(1, 2))
+plot(mussel.lm1, which = 5)		
+plot(mussel.lm1, which = 6)		
+```
+# set graphics to default
+```{r}
+par(op)
+```
+
+The car package has clever validation materials too....
+
+1. Influential points....leverage etc # Influence Plot
+
+```{r}
+influencePlot(mussel.lm1, id=list(method="noteworthy"), main="Influence Plot", sub="Circle size is proportial to Cook's Distance" )
+```
+again 21 (and 3) are worth looking at...but not huge enough for panic measures
+
+You can also look at the Normality of Residuals
+qq plot for studentized resid
+```{r}
+qqPlot(mussel.lm1, main="QQ Plot")
+```
+looks fine...they sit within the CIs and along the line; indicate normally distributed residuals
+
+************************************************
+PART THREE: ANCOVA (MORE THAN ONE EXPLANATORY) *
+************************************************
+
+Load the limpet.csv file (code from Beckerman and Petchey 2012)
+You should know the code by now!!!
+And look at its structure
+
+```{r}
+Limpet <- -----------
+```
+
+Check the structure
+```{r}
+glimpse(-------)
+```
+
+Do some exploratory plots using boxplots of the two factors
+```{r}
+boxplot(------ ~ ------, data = -------) 
+```
+
+Or using ggplot. NOTE: recall density is an integer so to make it boxplot in ggplot we need to force it to a factor using as.factor(). Base graphics do not need this...see above.
+
+```{r}
+ggplot(Limpet, aes(x=as.factor(DENSITY), y=EGGS)) + geom_boxplot() + theme_bw() + labs(title ="", x = "Density treatment", y = "Number of Eggs")
+ggplot(Limpet, aes(x=SEASON, y=EGGS)) + geom_boxplot() + theme_bw() + labs(title ="", x = "Season", y = "Number of Eggs")
+```
+adding theme_bw coerces ggplot to plot in black and white. Try removing that chunk of code to see the default colour version.
+
+Plot the lines and points one plot to compare them - we are now moving to use ggplot
+```{r}
+ggplot(Limpet, aes(x= DENSITY, y = EGGS, colour = SEASON)) + geom_point() + scale_colour_manual(values = c(spring = "green", summer = "red")) + theme_bw()
+```
+
+Nowlet's run a linear ANCOVA model using the function lm()
+REFER TO LECTURE MATERIAL TO LOOK AT THE HYPOTHESES WE CAN TEST USING THIS APPROACH...IMPORTANT. And read chapter 6 in Getting Started with R: An Introduction for Biologists by Beckerman et al.
+
+```{r}
+Limpet.lm <- lm(EGGS ~ DENSITY * SEASON, data = Limpet) # We going for the interaction model....
+```
+The code includes EGGS ~ DENSITY * SEASON
+* = add in the interaction effect 
+
+We'll start by checking the assumption through validation
+```{r}
+autoplot(Limpet.lm)
+```
+They look pretty good to me. Slight indication of a step up in residual v fitted values but nothing to worry about. Check Beckerman et al. for more details.
+
+Once we are happy the model is good look at the results using two commands anova() and summary()
+
+```{r}
+summary(Limpet.lm)
+```
+REFER TO PAGES IN BECKERMAN ET AL FOR THIS AND ALSO LOOK AT THE LECTURE FOR A DETAILED INTERPRETATION OF THESE RESULTS. THIS IS AN IMPORTANT STEP
+DON'T IGNORE IT
+
+We create the plot using the predict() function you were introduced to earlier in this session; NOTE: this is an experiment so we have replicates (3 replicates of 4 densities and 2 season)
+or 3 x 4 x 2 = 24
+
+We can see this if we use the regression equation to predict 'y' at each 'x' (which we measured) predict(Limpet.lm) have a look - the predictions are repeated in groups of 3s!!
+
+So we need a slightly different approach to predicting to the one we used above.
+
+NOTE: We use predict to generate predictions from our regression equations for data values between our measure known values. It is like drawing vertical line up from the X axis on a line graph to the regression line, followed by an horizontal line from the regression line to the Y axis to estimate values from the regression line.
+
+First we need to create a vector pulling through the replicates that are repeated (DENSITY and SEASON)
+
+To do this we need to use two functions predict and expand.grid
+
+predict just predicts across the regression line for each level....
+```{r}
+predict(Limpet.lm)
+```
+
+Make some new density values to predict at and drop into a dataframe. expand.grid() is a function that generates a grid of numbers—essentially it builds a factorial representation of any variables you provide to it, and returns a data frame. 
+```{r}
+new.x <- expand.grid(DENSITY = seq(from = 8, to = 45, length.out = 10))
+
+```
+look at it
+```{r}
+head(new.x)
+```
+Now let's add SEASON in. Recall it has two levels - spring and summer.
+
+```{r}
+new.x <- expand.grid(
+  DENSITY = seq(from = 8, to = 45, length.out = 10),
+  SEASON = c("spring","summer")) 
+```
+look at it (again)
+```{r}
+head(new.x) 
+```
+We will use predict() with three arguments: a model, a value for newdata, and a request for confidence intervals. And we assign what predict returns to an object called new.y:
+```{r}
+new.y <- predict(Limpet.lm, newdata = new.x,
+                 interval = 'confidence')
+```
+Check it...
+```{r}
+head(new.y)
+```
+
+We have new.x, which looks like a version of the explanatory variables. And we have new.y, which is estimated using the coefficients from the model we have actually fitted, along with the 95% confidence interval around each value, with nice names — fit, lwr, and upr
+
+The next step Beckerman et al. call ‘housekeeping’; an important part of using R, and at this point in the plotting cycle. To do this we combine the new y’s with the new x’s, so that we have a clear picture of what it is you’ve made. We can do that with the function data.frame(). We call the data frame Limpet.addition,’cause we are gonna add these to the plot.
+
+```{r}
+Limpet.addition <- data.frame(new.x, new.y)
+Limpet.addition <- rename(Limpet.addition, EGGS = fit)
+```
+
+Check it
+```{r}
+head(Limpet.addition)
+```
+So, now you have a new, small data frame that contains the grid of seasons and densities, as well as the predicted values and 95% CI at each of these combinations. You did not need to specify the coefficients, or the equations for the lines. predict() does all of that for you. You did not need to add and subtract 1.96*standard error to and from each value either to generate the CI… predict() does all of that for you.
+
+You are now ready to plot the and use the predictions
+```{r}
+ggplot(Limpet, aes(x = DENSITY, y = EGGS, colour = SEASON)) + 
+  # first add in the points
+  geom_point(size = 5) +
+  # now add in the fits and CIs
+  # NOte DENSITY and EGG are inherited so don't need specifying
+  geom_smooth(data = Limpet.addition, aes(ymin = lwr, ymax = upr,
+                                          fill = SEASON), stat = 'identity') +
+  # now adjust colours
+    scale_colour_manual(values = c(spring = "green", summer = "red")) +
+    scale_fill_manual(values = c(spring = "green", summer = "red")) +
+    # add theme
+    theme_bw()
+```
+
+************************************************
+PART FOUR: Class Exercises. There are three!   *
+************************************************
+1. Datafile = old faithful. It is in the base system already as a dataframe called "faithful". Type str(faithful) to see its structure.
+There are two observation variables in the dataset.
+The first one, called eruptions, is the duration of the geyser eruptions (mins).
+The second one, called waiting, is the length of waiting period until the next eruption (mins).
+Response = eruptions
+Explanatory = waiting
+272 rows v 2 columns see dim(faithful)
+
+************************************************
+PART FOUR: Class Exercises. There are three!   *
+************************************************
+1. Datafile = old faithful. It is in the base system already as a dataframe called "faithful". Type str(faithful) to see its structure.
+There are two observation variables in the dataset.
+The first one, called eruptions, is the duration of the geyser eruptions (mins).
+The second one, called waiting, is the length of waiting period until the next eruption (mins).
+Response = eruptions
+Explanatory = waiting
+272 rows v 2 columns see dim(faithful)
+
+Have a look at the file
+```{r}
+glimpse(faithful)
+```
+ggplot to look at the shape of the relationship
+```{r}
+ggplot(faithful, aes(waiting,eruptions)) + geom_point()
+```
+ - looks linear....so run a basic lm
+```{r}
+Old <- lm(eruptions ~ waiting, data = faithful)
+summary(Old) 
+```
+So eruption size is strongly related to waiting times. The longer the wait the bigger the eruption.
+
+But before we accept this model we must validate it.
+
+```{r}
+autoplot(Old)
+```
+Looks okay - so we can finalise the model by creating some predictions and the replotting.
+
+create some predictions
+```{r}
+# add 'fit', 'lwr', and 'upr' columns to dataframe (generated by predict)
+old.predict <- cbind(faithful, predict(Old, interval = 'confidence'))
+
+# plot the points (actual observations), regression line, and confidence interval
+p <- ggplot(old.predict, aes(waiting,eruptions))
+p <- p + geom_point()
+p <- p + geom_line(aes(waiting, fit))
+p <- p + geom_ribbon(aes(ymin=lwr,ymax=upr), alpha=0.3)
+p
+```
+
+
+2. Use the mussel data (mussel.csv) but with response variable abundance (Mussel$INDIV) not species richness (Mussel$SPECIES) as we used in the example above
+
+3. Use the compensation.csv dataset and undertake an ANCOVA analysis base the approach on the limpet analysis above
+
+***********************************************
+TASKS - repeat on all datasets:
+1. Run the model and validate it.
+2. Create a final model plot with predicted data, 95% CIs, regression equation, R-squared value (where appropriate - not in the ANCOVA model);
+3. Interpret the model output
+************************************************
+
+2. Use the mussel data (mussel.csv) but with response variable abundance (Mussel$INDIV) not species richness (Mussel$SPECIES) as we used in the example above
+
+3. Use the compensation.csv dataset and undertake an ANCOVA analysis base the approach on the limpet analysis above
+
+***********************************************
+TASKS - repeat on all datasets:
+1. Run the model and validate it.
+2. Create a final model plot with predicted data, 95% CIs, regression equation, R-squared value (where appropriate - not in the ANCOVA model);
+3. Interpret the model output
+************************************************

@@ -1,0 +1,437 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Cmd+Shift+Enter*. 
+
+****************************************************************************
+This is the source script for WEEK 5: Comparing groups                     *
+****************************************************************************
+Jon Sadler Feb 2014 
+updated Feb 2020
+
+Create a directory on your desktop called 'RWork' (or whatever you want) and download the data and script files from the Canvas website)
+Spend the some time reviewing last weeks material....!!!!
+Normal run of start up commands
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Cmd+Option+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Cmd+Shift+K* to preview the HTML file). 
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+****************************************************************************************
+INTRODUCTION - Means and variability (see excellent chapter in Crawley's book on this).* 
+****************************************************************************************
+```{r}
+y <- c(13, 7, 5, 12, 9, 15, 6, 11, 9, 7, 12) # create some basic data
+plot(y, ylim = c(0, 20))    # plot it as a scatter limiting the axis 0 - 20
+
+# How can we quantify this scatter? We could use the range
+range(y)
+
+# But we need something standardised against the mean...
+
+mean(y)
+
+y - mean(y)  # The result shows both negative and positive values (not ideal when we sum it)
+
+# So we square the sum to get the 'sum of squares'
+sum((y-mean(y))^2)
+
+# but this value is going to increase everytime we add to it!
+# So we need to standardise it by dividing the value by the number of samples
+
+sum((y - mean(y))^2)/(length(y) - 1) # Notice we are subtracting one from the number of samples = the degrees of freedom
+
+# or we can just call the var() function
+var(y)
+
+```
+
+************************************************
+PART 1: Comparisons of two independent samples *
+t-Tests                                        *
+use ozone.csv                                  *
+************************************************
+Load in datafile (use the filechoose command) - FILL IN THE CODE NEEDED IN THE BLANKS...
+```{r}
+ozone <- _____________
+```
+
+look at it to establish its structure and form
+
+```{r}
+str(------)
+View(------)
+```
+We wish to know if the two gardens differ in their ozone concentrations
+We can use a histogram to show this; it will illustrate the central tendencies of the data
+But first we need to subset the data to pull out the bits we need for the comparison. We did this last week with the same data
+
+```{r}
+GardA <- ozone[ozone$Garden == "A", ]
+GardB <- subset(ozone, Garden == "B") # And the same using the subset function 
+```
+
+Make a picture and check the assumptions
+Set graphics parameters to give us a 2 row, 1 column plot
+
+```{r}
+par(mfrow = c(2, 1))
+```
+
+Add histograms with a fixed range for the X axis
+
+```{r}
+hist(GardA$O3, xlim = c(0, 7), main = "", col = "Darkblue", xlab = "Garden A") 
+hist(GardB$O3, xlim = c(0, 7), main = "", col = "Lightblue", xlab = "Garden B")
+```
+
+turn off former graphics device
+```{r}
+dev.off() 
+```
+
+CLASS Exercise 1 MORE assumption checking....(10 mins max) 
+(i) plotting a qqplot (use help ?qqplot)# (ii) plotting a QQPlot READ the help file!
+
+```{r}
+qqnorm(ozone$O3); qqline(ozone$O3)
+```
+
+(ii) using the shapiro-wilks test (use the help system ?shapio.test). READ the help file!
+
+```{r}
+shapiro.test(ozone$O3)
+```
+
+(iii) calculating the garden variance
+
+You've already done this.
+
+```{r}
+var(-----$-----) # for garden A
+var(-----$-----) # for garden B
+```
+
+(iv) test for heterogeneity of variances using levenes test (You need to load the 'car' library first; then select ??leveneTest)
+```{r}
+library(car)
+leveneTest(O3 ~ Garden, data = ozone)
+```
+
+Run a t-test
+
+```{r}
+t.test(GardA$O3, GardB$O3)
+```
+Sometimes it makes sense to store the response variable in one column - so in long format or row-column...
+With an addition column that identifies the groups
+When data are in this format then we need a different test syntax
+This is what we have in our data anyway - look at it
+
+t-test with using a grouping factor
+
+```{r}
+t.test(O3 ~ Garden, data = ozone) # Note - the data argument and '~' (tilde) operator (you'll see a lot of this)
+```
+
+U-Tests (Wilcoxon tests)
+Use these if your variables are not normally distributed or if variances are not equal
+```{r}
+wilcox.test(O3 ~ Garden, data = ozone)
+```
+We'll ignore the error for the time being - it is suggesting the use of 
+a permutation approach perhaps using the 'coin' package see code below.
+Exact Wilcoxon Mann Whitney Rank sum using the coin package
+Use where y is numeric and x is binary factor
+
+```{r}
+library(coin)
+wilcox_test(O3 ~ Garden, data = ozone, distribution = "exact")
+```
+
+********************************************************
+ PART TWO: Comparisons of more than two samples        *
+********************************************************
+
+Introduction to linear models
+We'll be using the aov() function to do most of this (both both lm and glm will work)
+
+Single factor Anova
+Create the data
+
+```{r}
+H <- c(1,2,2,5,6,5,2,1)   					# Create samples
+Sam <- c(1,1,1,2,2,2,3,3) 					# Categorize samples
+A.test <- data.frame(H, Sam)				# Create data frame
+A.test$Sam <- as.factor(A.test$Sam)			# Make sure sample is a factor - remember we entered as a vector of integers
+```
+
+Check the data
+```{r}
+str(A.test)
+View(-----)
+```
+
+
+Draw some pictures
+```{r}
+hist(Sam, xlab = "Sample", main = "", col = "grey")
+```
+
+(iii) Use a boxplot to look at the data structure - Look at the medians in samples 1 and 2!
+```{r}
+boxplot(H ~ Sam, data = A.test, xlab = "Sample", ylab = "Number")
+```
+
+CLASS EXERCISE 2: 
+(i) Check for normality, histogram, QQplot, Shapiro-Wilks test
+
+QQ-plot. It needs the sample data to be numeric not a factor so we will change it
+```{r}
+A.test$Sam <- as.numeric(A.test$Sam) # This command converts the structure to numeric
+qqnorm(-----); qqline(-----) # Add in the correct dataframe and column names
+```
+
+Shapiro-Wilks
+```{r}
+shapiro.test(-----$-----)
+```
+
+(ii) Check for heterogeneity of variances using a levene test. NOTE there are graphical means of doing this....more next week
+
+```{r}
+leveneTest(---- ~ -----, data = -----)
+```
+NOTE: There is considerable debate over normality tests (see: http://www.r-bloggers.com/normality-tests-don%E2%80%99t-do-what-you-think-they-do/)
+
+
+Run single factor ANOVA
+```{r}
+Anova.run <- aov(H ~ Sam, data = A.test)
+```
+
+Check results
+```{r}
+summary(Anova.run)
+```
+
+Our boxplot indicated a large difference between sample 2 and others
+we can examine the difference between the group means using a posthoc test 
+such as a Tukey test - TukeyHSD(add in anova object name)
+
+```{r}
+TukeyHSD(Anova.run)
+```
+Comparisons of more than two non-independent samples
+
+Kruskal-Wallis tests
+```{r}
+KW.test <- kruskal.test(----- ~ -----)
+KW.test # Look at the results
+```
+
+********************************************************
+ PART THREE: 2-way and factorial ANOVA                 *
+********************************************************
+
+Load in data (datafile  = Grazing.csv)
+
+```{r}
+Graze <- read.csv(file.choose())
+```
+
+Look at it
+```{r}
+str(----)
+View(----)
+```
+
+••• !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!••••••••••••••••••••
+ IMPORTANT FIRST TASK IS ESTABLISHING WHETHER YOUR ANALYSIS IS BALANCED •
+ THIS IS CRUCIAL WHEN USING THE aov and lm() functions  
+ WHERE YOU ARE COMPARING TWO FACTORS                                   •
+••• !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! •••••••••••••••••••
+
+Check this using the table function
+```{r}
+table(Graze$Field, Graze$Grazing)
+```
+
+You can also 'test' for this using the replications function
+```{r}
+replications(Abund ~ Grazing * Field , data = Graze)
+!is.list(replications(Abund ~ Grazing * Field , data = Graze)) # We're safe !!!!
+```
+
+Draw some pictures - class exercise (10 mins) 
+```{r}
+hist(Graze$Abund)
+```
+
+Compare the histograms so separate the fields (needs the subset command)
+```{r}
+Field1 <- subset(----,Field == "Lower")
+Field2 <- subset(----, Field == "Top")
+```
+
+Add histograms with a fixed range for the X axis
+```{r}
+par(mfrow = c(2, 1))
+hist(----$Abund, xlim = c(0, 40), main = "", col = "Darkblue", xlab = "Field 1") 
+hist(----$Abund, xlim = c(0, 40), main = "", col = "Lightblue", xlab = "Field 2")
+```
+
+Boxplots to look at difference of factors
+```{r}
+par(mfrow = c(2, 1))
+boxplot(Abund ~ Field, data = Graze)
+boxplot(Abund ~ Grazing, data = Graze)
+```
+
+turn off former graphics device
+```{r}
+dev.off() 
+```
+
+We can also combine the factor as an interaction. NOTE the * symbol indicates the interaction
+```{r}
+boxplot(Abund ~ Field * Grazing, ylab =  "Abundance of Rye Grass", xlab = "Contrasts of field and grazing level", data = Graze)
+```
+
+Coplot to look at the interaction of the factors (with added smoother line)
+
+```{r}
+coplot(Abund ~ Grazing | Field, panel = panel.smooth, xlab = "Grazing Level", ylab = "Rye grass abundance", data = Graze)
+```
+
+Notice how R orders the factors alphabetically on the X axis. Unhelpful because the (High, Low, Mid) are relational to each other - indicating a known order 
+Compare the means and errors on a line plot
+To do this we need to summarise the data to get the means and standard errors
+There are numerous ways of doing this (tapply etc) but we are going to do it using a package called dplyr
+You'll need to install it as it won't be there......
+
+Reorder the categorical variable. R plots factorial variables alphabetically - not useful when your factors relate to a quantity of something!!!!
+
+```{r}
+Graze$Grazing <- factor(Graze$Grazing, levels = c("Low", "Mid", "High"), ordered = TRUE)
+```
+
+Run the two-way ANOVA
+```{r}
+Grazeaov <- aov(Abund ~ Field + Grazing, data = Graze)
+summary(Grazeaov)
+```
+
+Now let's consider the interaction between the two factors
+
+```{r}
+Grazeaov1 <- aov(Abund ~ Field * Grazing, data = Graze)
+summary(Grazeaov1)
+```
+
+We can visualise the interaction plot using the interaction.plot function
+
+```{r}
+interaction.plot(Graze$Grazing, Graze$Field, Graze$Abund, col=c(2,3), xlab = "Grazing Regime", ylab = "Rye Grass abundance", trace.label = "Field")
+```
+
+To repeat the interaction plot in ggplot2 you'll need to generate some summary data (mean, and standard error (se))
+Have a go at using summarise in dplyr to generate summary data on the two treatments call it output Grazesum 
+(or you'll overwrite your datafile!). You need to group_by factor and summarize for the mean, sd, 
+count the number of samples (using length()) and generate the se using sd/sqrt(N)
+
+```{r}
+library(dplyr)
+Grazesum <- group_by(Graze, Field, Grazing) %>% summarise(mean = mean(Abund),
+													   sd = sd(Abund),
+													   N = length(Abund),
+													   se = sd/sqrt(N))
+```
+
+Now plot the interaction plot
+```{r}
+library(ggplot2) # load ggplot2
+pd <- position_dodge(.3)
+ggplot(Grazesum, aes(x = Grazing, y = mean, colour = Field, group = Field)) + 
+  geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.2, size = 0.25, colour = "Black", 
+                position = pd) + geom_line(position = pd) + geom_point(position = pd, size = 2.5)
+```
+
+Let's check some assumptions using R's in-build plot functions....these do the same thing as your tests (e.g. Levenes) and QQ-plots
+
+```{r}
+par(mfrow = c(2, 2)) # plot four pictures per page
+plot(Grazeaov1)
+```
+YOU WILL BE USING THIS COMMAND ALOT. PLEASE READ (COPY AND PASTE INTO YOUR BROWSER):
+https://www.oxfordscholarship.com/view/10.1093/acprof:oso/9780198787839.001.0001/acprof-9780198787839-chapter-5
+This whole book is a HUGE must read - we have an online library subscription (check the resources tab on the CANVAS page):
+Getting Started with R: An Introduction for Biologists
+Andrew Beckerman, Dylan Childs, and Owen Petchey
+
+We can validate the data in a ggplot environment too but we need to load a new library
+
+```{r}
+install.packages("ggfortify")
+library(ggfortify)
+autoplot(Grazeaov1)
+```
+
+•••••••••••••••••••••••••••••••••••••••••••
+PART FOUR: CLASS EXERCISES                •
+•••••••••••••••••••••••••••••••••••••••••••
+
+Do the following for all data files:
+
+1. Load in the data and examine it's structure (including experimental balance)
+2. Posit your hypotheses (null and alternative)
+3. play with some pictures
+4. draw a contingency table to figure out how the data are structured
+5. Select an appropriate ANOVA-based model (NOTE: we have more than 2 samples...so no t tests!)
+6. Validate the model
+7. Briefly interpret the results - in your script file!!!!
+
+-----------------------------------------------------------------------------------------
+EXERCISE 1
+Filename: Hoglouse.csv - a file of water louse distribution along a rivers in Devon
+response - hoglouse numbers
+explanatory variable - Upper, Mid and lower sites (i.e.  longitudinal profile)
+see Gardner's book....on the reading lists
+----------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------
+EXERCISE 2
+Filename: Medley.csv
+Medley and Clements (1998) investigated the impact of zinc contamination (and other heavy metals) on the diversity of diatom species in the USA Rocky Mountains (from
+Box 8.1 of Quinn and Keough (2002))
+File contents:
+DIATOM - number of different species of diatoms on the a known area of rocks in streams (continous variable)
+ZINC - mpm of zinc in the water column (background, low, medium, high) (factor - explanatory variable)
+----------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------
+EXERCISE 3
+Filename: Quinn.csv (data from By G. P. Quinn and M. J. Keough, 2002 - "Experimental Design and Data Analysis for Biologists" )
+File contents:
+DENSITY - urchin density treatment (L1 = 8 individals per 225 cm2 enclosure, L2 = 15, L3 = 30 and L4 = 45) (factor - explanatory variable)
+SEASON - Season of the year (Spring or summer) (factor - explanatory variable)
+EGGS - egg production by limpets (continous response variable)
+----------------------------------------------------------------------------------------
+
+-----------------------------------------------------------------------------------------
+EXERCISE 4
+Filename: fish_pred.csv (data from Doncaster and Davey, 2002, p. 50)
+fish predation experiment - using enclosures of two species of fish to assess their impact on predation on chironomids
+File contents:
+Density - density of chironomids left activty fish predation exercise (response variable - continuous)
+Loach - Presence of a loach in the enclosure (factor - 0 = absent, 1 = present)
+Bullhead - Presence of a bullhead in the enclosure (factor - 0 = absent, 1 = present)
+----------------------------------------------------------------------------------------
+
+ONE OF THESE LAST TWO FILES WILL BE USED AS A FORMATIVE EXERCISE DUE IN WEEK 8
